@@ -10,9 +10,9 @@ This repository contains these plugins to support running Velero on Microsoft Az
 
 ## Setup
 
-To set up Velero on AWS, you:
+To set up Velero on Azure, you:
 
-* [Create an S3 bucket][1]
+* [Create an Azure storage account and blob container][1]
 * [Set permissions for Velero][2]
 * [Install and start Velero][3]
 
@@ -24,7 +24,7 @@ Run:
 az login
 ```
 
-## Create S3 bucket
+## Create Azure storage account and blob container
 
 ### (Optional) Change to the Azure subscription you want to create your backups in
 
@@ -192,7 +192,7 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
-[1]: #Create-S3-bucket
+[1]: #Azure-storage-account-and-blob-container
 [2]: #Set-permissions-for-Velero
 [3]: #Install-and-start-Velero
 [4]: https://velero.io/docs/master/install-overview/

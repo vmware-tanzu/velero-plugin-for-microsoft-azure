@@ -15,7 +15,7 @@
 PKG := github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
 BIN := velero-plugin-for-microsoft-azure
 
-REGISTRY ?= carlisia
+REGISTRY ?= velero 
 IMAGE ?= $(REGISTRY)/velero-plugin-for-microsoft-azure
 BUILD_IMAGE ?= golang:1.12-stretch
 

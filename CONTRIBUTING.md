@@ -7,7 +7,7 @@ should be a new file created in the `changelogs/unreleased` folder. The file sho
 naming convention of `pr-username` and the contents of the file should be your text for the
 changelog.
 
-    velero-plugin-for-aws/changelogs/unreleased   <- folder
+    velero-plugin-for-microsoft-azure/changelogs/unreleased   <- folder
         000-username            <- file
 
 

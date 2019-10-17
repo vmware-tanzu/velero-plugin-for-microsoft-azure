@@ -31,7 +31,7 @@ The configurable parameters are as follows:
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `provider` | String `gcp` | Required Field | The name for the cloud provider which will be used to actually store the backups. |
+| `provider` | String `azure` | Required Field | The name for the cloud provider which will be used to actually store the backups. |
 | `objectStorage` | ObjectStorageLocation | Specification of the object storage for the given provider. |
 | `objectStorage/bucket` | String | Required Field | The storage bucket where backups are to be uploaded. |
 | `objectStorage/prefix` | String | Optional Field | The directory inside a storage bucket where backups are to be uploaded. |
