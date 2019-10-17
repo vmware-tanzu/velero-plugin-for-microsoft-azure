@@ -192,7 +192,7 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
-[1]: #Azure-storage-account-and-blob-container
+[1]: #Create-Azure-storage-account-and-blob-container
 [2]: #Set-permissions-for-Velero
 [3]: #Install-and-start-Velero
 [4]: https://velero.io/docs/master/install-overview/
