@@ -12,8 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:stretch-slim
+FROM golang:1.13-buster AS build
+WORKDIR /go/src/github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
+# copy vendor in separately so the layer can be cached if the contents don't change
+COPY vendor vendor
+COPY velero-plugin-for-microsoft-azure velero-plugin-for-microsoft-azure
+RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
+
+
+FROM ubuntu:bionic
 RUN mkdir /plugins
-ADD velero-plugin-for-microsoft-azure /plugins/
+COPY --from=build /go/bin/velero-plugin-for-microsoft-azure /plugins/
 USER nobody:nobody
 ENTRYPOINT ["/bin/bash", "-c", "cp /plugins/* /target/."]
