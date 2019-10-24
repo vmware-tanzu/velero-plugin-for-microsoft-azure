@@ -176,6 +176,7 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 ```bash
 velero install \
     --provider azure \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.0.0-beta.1 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
@@ -195,7 +196,7 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [1]: #Create-Azure-storage-account-and-blob-container
 [2]: #Set-permissions-for-Velero
 [3]: #Install-and-start-Velero
-[4]: https://velero.io/docs/master/install-overview/
+[4]: https://velero.io/docs/master/install-overview/#install-the-cli
 [7]: backupstoragelocation.md
 [8]: volumesnapshotlocation.md
 [11]: https://velero.io/docs/master/faq/
