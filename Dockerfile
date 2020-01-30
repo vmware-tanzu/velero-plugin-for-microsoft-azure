@@ -23,5 +23,5 @@ RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-microsoft-
 FROM ubuntu:bionic
 RUN mkdir /plugins
 COPY --from=build /go/bin/velero-plugin-for-microsoft-azure /plugins/
-USER nobody:nobody
+USER nobody:nogroup
 ENTRYPOINT ["/bin/bash", "-c", "cp /plugins/* /target/."]
