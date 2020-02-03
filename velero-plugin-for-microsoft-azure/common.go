@@ -32,6 +32,7 @@ const (
 	clientIDEnvVar       = "AZURE_CLIENT_ID"
 	clientSecretEnvVar   = "AZURE_CLIENT_SECRET"
 	cloudNameEnvVar      = "AZURE_CLOUD_NAME"
+	accountKeyEnvVar     = "AZURE_ACCOUNT_KEY"
 
 	resourceGroupConfigKey = "resourceGroup"
 )
@@ -43,6 +44,10 @@ func GetResticEnvVars(config map[string]string) (map[string]string, error) {
 	storageAccountKey, _, err := getStorageAccountKey(config)
 	if err != nil {
 		return nil, err
+	}
+
+	if _, err := getRequiredValues(mapLookup(config), storageAccountConfigKey); err != nil {
+		return nil, errors.Wrap(err, "unable to get all required config values")
 	}
 
 	return map[string]string{
