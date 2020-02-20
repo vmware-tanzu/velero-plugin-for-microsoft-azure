@@ -32,7 +32,6 @@ const (
 	clientIDEnvVar       = "AZURE_CLIENT_ID"
 	clientSecretEnvVar   = "AZURE_CLIENT_SECRET"
 	cloudNameEnvVar      = "AZURE_CLOUD_NAME"
-	accountKeyEnvVar     = "AZURE_ACCOUNT_KEY"
 
 	resourceGroupConfigKey = "resourceGroup"
 )

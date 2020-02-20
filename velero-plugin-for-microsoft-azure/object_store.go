@@ -34,8 +34,9 @@ import (
 )
 
 const (
-	storageAccountConfigKey = "storageAccount"
-	subscriptionIdConfigKey = "subscriptionId"
+	storageAccountConfigKey   = "storageAccount"
+	storageSecretKeyConfigKey = "storageSecretKey"
+	subscriptionIdConfigKey   = "subscriptionId"
 )
 
 type containerGetter interface {
@@ -148,10 +149,17 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 2. get Storage Account Access Key from AZURE_ACCOUNT_KEY, if it exists. If the env var does not
+	// 2. get storage key from secret using key config[storageSecretKeyConfigKey]. If the config does not
 	// exist, continue obtaining it using API
-	storageKey := os.Getenv(accountKeyEnvVar)
-	if storageKey != "" {
+	var storageKey string
+
+	secretKey := config[storageSecretKeyConfigKey]
+	if secretKey != "" {
+		storageKey = os.Getenv(secretKey)
+		if storageKey == "" {
+			return "", env, errors.Errorf("no storage key secret with key %s found", secretKey)
+		}
+
 		return storageKey, env, nil
 	}
 
@@ -201,7 +209,7 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 	}
 
 	if storageKey == "" {
-		return "", env, errors.New("No storage key with Full permissions found")
+		return "", env, errors.New("no storage key with Full permissions found")
 	}
 
 	return storageKey, env, nil
@@ -227,7 +235,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		return err
 	}
 
-	// 6. get storageClient and blobClient
+	// 1. get storageClient and blobClient
 	if _, err := getRequiredValues(mapLookup(config), storageAccountConfigKey); err != nil {
 		return errors.Wrap(err, "unable to get all required config values")
 	}
