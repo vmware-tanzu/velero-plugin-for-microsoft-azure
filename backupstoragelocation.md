@@ -13,18 +13,18 @@ spec:
   #
   # Required.
   provider: velero.io/azure
-  
+
   objectStorage:
     # The bucket/blob container in which to store backups.
     #
     # Required.
     bucket: my-bucket
-    
+
     # The prefix within the bucket under which to store backups.
     #
     # Optional.
     prefix: my-prefix
-  
+
   config:
     # Name of the resource group containing the storage account for this backup storage location.
     #
@@ -35,6 +35,11 @@ spec:
     #
     # Required.
     storageAccount: my-backup-storage-account
+
+    # Secret key of the storage account access key for this backup storage location. Key is looked up in $AZURE_CREDENTIALS_FILE.
+    #
+    # Optional.
+    storageSecretKey: my-backup-storage-secret-key
 
     # ID of the subscription for this backup storage location.
     #

@@ -37,6 +37,7 @@ import (
 
 const (
 	storageAccountConfigKey = "storageAccount"
+    storageSecretKeyConfigKey = "storageSecretKey"
 	subscriptionIdConfigKey = "subscriptionId"
 	blockSizeConfigKey      = "blockSizeInBytes"
 
@@ -160,10 +161,17 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 2. get Storage Account Access Key from AZURE_ACCOUNT_KEY, if it exists. If the env var does not
+	// 2. get storage key from secret using key config[storageSecretKeyConfigKey]. If the config does not
 	// exist, continue obtaining it using API
-	storageKey := os.Getenv(accountKeyEnvVar)
-	if storageKey != "" {
+	var storageKey string
+
+	secretKey := config[storageSecretKeyConfigKey]
+	if secretKey != "" {
+		storageKey = os.Getenv(secretKey)
+		if storageKey == "" {
+			return "", env, errors.Errorf("no storage key secret with key %s found", secretKey)
+		}
+
 		return storageKey, env, nil
 	}
 
