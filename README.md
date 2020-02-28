@@ -14,7 +14,7 @@ Below is a listing of plugin versions and respective Velero versions that are co
 
 | Plugin Version  | Velero Version |
 |-----------------|----------------|
-| v1.0.0          | v1.2.0         |
+| v1.0.x          | v1.2.0         |
 
 ## Setup
 
@@ -185,7 +185,7 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.0.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.0.1 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
