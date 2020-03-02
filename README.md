@@ -14,6 +14,7 @@ Below is a listing of plugin versions and respective Velero versions that are co
 
 | Plugin Version  | Velero Version |
 |-----------------|----------------|
+| v1.0.x          | v1.3.0         |
 | v1.0.x          | v1.2.0         |
 
 ## Setup
@@ -198,19 +199,19 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 (Optional) Specify [additional configurable parameters][8] for the `--snapshot-location-config` flag.
 
-(Optional) Specify [CPU and memory resource requests and limits][9] for the Velero/restic pods.
+(Optional) [Customize the Velero installation][9] further to meet your needs.
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
 [1]: #Create-Azure-storage-account-and-blob-container
 [2]: #Set-permissions-for-Velero
 [3]: #Install-and-start-Velero
-[4]: https://velero.io/docs/master/install-overview/#install-the-cli
+[4]: https://velero.io/docs/install-overview/
 [7]: backupstoragelocation.md
 [8]: volumesnapshotlocation.md
-[11]: https://velero.io/docs/master/faq/
+[9]: https://velero.io/docs/customize-installation/
+[11]: https://velero.io/docs/faq/
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
-[9]: https://velero.io/docs/master/install-requirements
 [22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
