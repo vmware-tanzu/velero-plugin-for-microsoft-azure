@@ -25,8 +25,9 @@ import (
 	"strings"
 	"time"
 
-	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
+	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -82,12 +83,12 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	}
 
 	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
-	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, resourceGroupEnvVar)
+	envVars, err := getRequiredValues(os.Getenv, subscriptionIDEnvVar)
 	if err != nil {
 		return errors.Wrap(err, "unable to get all required environment variables")
 	}
 
-	// 2. set a different subscriptionId for snapshots if specified
+	// // 2. set a different subscriptionId for snapshots if specified
 	snapshotsSubscriptionId := envVars[subscriptionIDEnvVar]
 	if val := config[subscriptionIdConfigKey]; val != "" {
 		// if subscription was set in config, it is required to also set the resource group
@@ -97,8 +98,8 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		snapshotsSubscriptionId = val
 	}
 
-	// 3. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// exist, parseAzureEnvironment will return azure.PublicCloud.
+	// // 3. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// // exist, parseAzureEnvironment will return azure.PublicCloud.
 	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
@@ -115,11 +116,11 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		}
 	}
 
-	// 5. get SPT
-	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
-	if err != nil {
-		return errors.Wrap(err, "error getting service principal token")
-	}
+	// // 5. get SPT
+	// spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
+	// if err != nil {
+	// 	return errors.Wrap(err, "error getting service principal token")
+	// }
 
 	// 6. set up clients
 	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
@@ -128,7 +129,12 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	disksClient.PollingDelay = 5 * time.Second
 	snapsClient.PollingDelay = 5 * time.Second
 
-	authorizer := autorest.NewBearerAuthorizer(spt)
+	// authorizer := autorest.NewBearerAuthorizer(spt)
+	authorizer, err := auth.NewAuthorizerFromEnvironment()
+	if err != nil {
+		return errors.Wrap(err, "unable to parse environemnt for a valid authentication method")
+	}
+
 	disksClient.Authorizer = authorizer
 	snapsClient.Authorizer = authorizer
 
@@ -151,6 +157,16 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	return nil
 }
 
+func getDiskStorageAccountType(volumeType string) (disk.DiskStorageAccountTypes, error) {
+	list := disk.PossibleDiskStorageAccountTypesValues()
+	for _, v := range list {
+		if volumeType == string(v) {
+			return v, nil
+		}
+	}
+	return "", errors.New("No valid storage account type: " + volumeType + ". Possible values are : " + fmt.Sprint(list))
+}
+
 func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
 	snapshotIdentifier, err := parseFullSnapshotName(snapshotID)
 	if err != nil {
@@ -164,7 +180,10 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 	}
 
 	diskName := "restore-" + uuid.NewV4().String()
-
+	diskType, err := getDiskStorageAccountType(volumeType)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
 	disk := disk.Disk{
 		Name:     &diskName,
 		Location: snapshotInfo.Location,
@@ -175,7 +194,7 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 			},
 		},
 		Sku: &disk.DiskSku{
-			Name: disk.StorageAccountTypes(volumeType),
+			Name: diskType,
 		},
 		Tags: snapshotInfo.Tags,
 	}
@@ -236,7 +255,7 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 
 	snap := disk.Snapshot{
 		Name: &snapshotName,
-		DiskProperties: &disk.DiskProperties{
+		SnapshotProperties: &disk.SnapshotProperties{
 			CreationData: &disk.CreationData{
 				CreateOption:     disk.Copy,
 				SourceResourceID: &fullDiskName,

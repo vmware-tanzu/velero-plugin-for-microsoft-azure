@@ -23,10 +23,10 @@ import (
 	"strings"
 	"time"
 
-	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage"
+	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/azure-sdk-for-go/storage"
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -136,47 +136,51 @@ func newObjectStore(logger logrus.FieldLogger) *ObjectStore {
 }
 
 func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
-	// load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
+	// // load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
 	if err := loadEnv(); err != nil {
 		return "", nil, err
 	}
 
-	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
-	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
+	// // 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+	envVars, err := getRequiredValues(os.Getenv, subscriptionIDEnvVar)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "unable to get all required environment variables")
 	}
 
-	// 2. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// exist, parseAzureEnvironment will return azure.PublicCloud.
+	// // 2. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// // exist, parseAzureEnvironment will return azure.PublicCloud.
 	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 3. check whether a different subscription ID was set for backups in config["subscriptionId"]
+	// // 3. check whether a different subscription ID was set for backups in config["subscriptionId"]
 	subscriptionId := envVars[subscriptionIDEnvVar]
 	if val := config[subscriptionIdConfigKey]; val != "" {
 		subscriptionId = val
 	}
 
-	// 4. we need config["resourceGroup"], config["storageAccount"]
-	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
-		return "", env, errors.Wrap(err, "unable to get all required config values")
-	}
+	// // 4. we need config["resourceGroup"], config["storageAccount"]
+	// if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+	// 	return "", env, errors.Wrap(err, "unable to get all required config values")
+	// }
 
-	// 5. get SPT
-	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
+	// // 5. get SPT
+	// spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
+	// if err != nil {
+	// 	return "", env, errors.Wrap(err, "error getting service principal token")
+	// }
+	authorizer, err := auth.NewAuthorizerFromEnvironment()
 	if err != nil {
-		return "", env, errors.Wrap(err, "error getting service principal token")
+		return "", nil, errors.Wrap(err, "Unable to get token from environment")
 	}
-
 	// 6. get storageAccountsClient
 	storageAccountsClient := storagemgmt.NewAccountsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionId)
-	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
+	storageAccountsClient.Authorizer = authorizer
+	// storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
 
 	// 7. get storage key
-	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey])
+	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey], storagemgmt.Kerb)
 	if err != nil {
 		return "", env, errors.WithStack(err)
 	}
