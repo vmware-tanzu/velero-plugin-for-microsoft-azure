@@ -108,8 +108,12 @@ type mockBlob struct {
 	mock.Mock
 }
 
-func (m *mockBlob) CreateBlockBlobFromReader(blob io.Reader, options *storage.PutBlobOptions) error {
-	args := m.Called(blob, options)
+func (m *mockBlob) PutBlock(blockID string, chunk []byte, options *storage.PutBlockOptions) error {
+	args := m.Called(blockID, chunk, options)
+	return args.Error(0)
+}
+func (m *mockBlob) PutBlockList(blocks []storage.Block, options *storage.PutBlockListOptions) error {
+	args := m.Called(blocks, options)
 	return args.Error(0)
 }
 
