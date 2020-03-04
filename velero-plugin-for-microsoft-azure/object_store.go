@@ -163,11 +163,8 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 
 	// 2. get storage key from secret using key config[storageSecretKeyConfigKey]. If the config does not
 	// exist, continue obtaining it using API
-	var storageKey string
-
-	secretKey := config[storageSecretKeyConfigKey]
-	if secretKey != "" {
-		storageKey = os.Getenv(secretKey)
+    if secretKey := config[storageSecretKeyConfigKey]; secretKey != "" {
+		storageKey := os.Getenv(secretKey)
 		if storageKey == "" {
 			return "", env, errors.Errorf("no storage key secret with key %s found", secretKey)
 		}
@@ -211,6 +208,7 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 		return "", env, errors.New("No storage keys found")
 	}
 
+    var storageKey string
 	for _, key := range *res.Keys {
 		// uppercase both strings for comparison because the ListKeys call returns e.g. "FULL" but
 		// the storagemgmt.Full constant in the SDK is defined as "Full".
