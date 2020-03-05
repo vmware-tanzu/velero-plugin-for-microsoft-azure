@@ -83,7 +83,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	}
 
 	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
-	envVars, err := getRequiredValues(os.Getenv, subscriptionIDEnvVar)
+	envVars, err := getRequiredValues(os.Getenv, subscriptionIDEnvVar, resourceGroupEnvVar)
 	if err != nil {
 		return errors.Wrap(err, "unable to get all required environment variables")
 	}
