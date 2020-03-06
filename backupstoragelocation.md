@@ -40,4 +40,11 @@ spec:
     #
     # Optional.
     subscriptionId: my-subscription
+
+    # The block size, in bytes, to use when uploading objects to Azure blob storage.
+    # See https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs#about-block-blobs
+    # for more information on block blobs.
+    # 
+    # Optional (defaults to 104857600, i.e. 100MB).
+    blockSizeInBytes: "104857600"
 ```

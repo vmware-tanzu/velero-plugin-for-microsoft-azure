@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,11 @@ import (
 const (
 	storageAccountConfigKey = "storageAccount"
 	subscriptionIdConfigKey = "subscriptionId"
+	blockSizeConfigKey      = "blockSizeInBytes"
+
+	// blocks must be less than/equal to 100MB in size
+	// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
+	defaultBlockSize = 100 * 1024 * 1024
 )
 
 type containerGetter interface {
@@ -131,9 +137,10 @@ func (b *azureBlob) GetSASURI(options *storage.BlobSASOptions) (string, error) {
 }
 
 type ObjectStore struct {
+	log             logrus.FieldLogger
 	containerGetter containerGetter
 	blobGetter      blobGetter
-	log             logrus.FieldLogger
+	blockSize       int
 }
 
 func newObjectStore(logger logrus.FieldLogger) *ObjectStore {
@@ -217,6 +224,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		resourceGroupConfigKey,
 		storageAccountConfigKey,
 		subscriptionIdConfigKey,
+		blockSizeConfigKey,
 	); err != nil {
 		return err
 	}
@@ -240,7 +248,30 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		blobService: &blobClient,
 	}
 
+	o.blockSize = getBlockSize(o.log, config)
+
 	return nil
+}
+
+func getBlockSize(log logrus.FieldLogger, config map[string]string) int {
+	val, ok := config[blockSizeConfigKey]
+	if !ok {
+		// no alternate block size specified in config, so return with the default
+		return defaultBlockSize
+	}
+
+	blockSize, err := strconv.Atoi(val)
+	if err != nil {
+		log.WithError(err).Warnf("Error parsing config.blockSizeInBytes value %v, using default block size of %d", val, defaultBlockSize)
+		return defaultBlockSize
+	}
+
+	if blockSize <= 0 || blockSize > defaultBlockSize {
+		log.WithError(err).Warnf("Value provided for config.blockSizeInBytes (%d) is outside the allowed range of 1 to %d, using default block size of %d", blockSize, defaultBlockSize, defaultBlockSize)
+		return defaultBlockSize
+	}
+
+	return blockSize
 }
 
 func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
@@ -255,9 +286,7 @@ func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 	// chunking approach for all objects.
 
 	var (
-		// blocks must be less than/equal to 100MB in size
-		// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
-		block    = make([]byte, 100*1024*1024)
+		block    = make([]byte, o.blockSize)
 		blockIDs []storage.Block
 	)
 
