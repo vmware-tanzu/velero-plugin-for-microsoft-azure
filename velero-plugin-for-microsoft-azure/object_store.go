@@ -34,9 +34,9 @@ import (
 )
 
 const (
-	storageAccountConfigKey   = "storageAccount"
-	storageSecretKeyConfigKey = "storageSecretKey"
-	subscriptionIdConfigKey   = "subscriptionId"
+	storageAccountConfigKey          = "storageAccount"
+    storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
+	subscriptionIdConfigKey          = "subscriptionId"
 )
 
 type containerGetter interface {
@@ -149,12 +149,12 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 2. get storage key from secret using key config[storageSecretKeyConfigKey]. If the config does not
+	// 2. get storage key from secret using key config[storageAccountKeyEnvVarConfigKey]. If the config does not
 	// exist, continue obtaining it using API
-    if secretKey := config[storageSecretKeyConfigKey]; secretKey != "" {
-		storageKey := os.Getenv(secretKey)
+    if secretKeyEnvVar := config[storageAccountKeyEnvVarConfigKey]; secretKeyEnvVar != "" {
+		storageKey := os.Getenv(secretKeyEnvVar)
 		if storageKey == "" {
-			return "", env, errors.Errorf("no storage key secret with key %s found", secretKey)
+			return "", env, errors.Errorf("no storage key secret with key %s found", secretKeyEnvVar)
 		}
 
 		return storageKey, env, nil
