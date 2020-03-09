@@ -36,10 +36,10 @@ spec:
     # Required.
     storageAccount: my-backup-storage-account
 
-    # Secret key of the storage account access key for this backup storage location. Key is looked up in $AZURE_CREDENTIALS_FILE.
+    # Name of the environment variable in $AZURE_CREDENTIALS_FILE that contains storage account key for this backup storage location.
     #
     # Optional.
-    storageSecretKey: my-backup-storage-secret-key
+    storageAccountKeyEnvVar: MY_BACKUP_STORAGE_ACCOUNT_KEY
 
     # ID of the subscription for this backup storage location.
     #
