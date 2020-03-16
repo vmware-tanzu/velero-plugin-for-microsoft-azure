@@ -235,10 +235,8 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [7]: backupstoragelocation.md
 [8]: volumesnapshotlocation.md
 [9]: https://velero.io/docs/customize-installation/
-[11]: https://velero.io/docs/faq/
-[9]: https://velero.io/docs/master/install-requirements
 [10]: #Set-storage-account-access-key
-[11]: https://velero.io/docs/master/faq/
+[11]: https://velero.io/docs/faq/
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
