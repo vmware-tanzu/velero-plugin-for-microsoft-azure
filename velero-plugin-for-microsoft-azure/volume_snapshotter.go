@@ -82,13 +82,13 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		return err
 	}
 
-	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
+	// 1. we need AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
 	envVars, err := getRequiredValues(os.Getenv, subscriptionIDEnvVar, resourceGroupEnvVar)
 	if err != nil {
 		return errors.Wrap(err, "unable to get all required environment variables")
 	}
 
-	// // 2. set a different subscriptionId for snapshots if specified
+	// 2. set a different subscriptionId for snapshots if specified
 	snapshotsSubscriptionId := envVars[subscriptionIDEnvVar]
 	if val := config[subscriptionIdConfigKey]; val != "" {
 		// if subscription was set in config, it is required to also set the resource group
@@ -98,8 +98,8 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		snapshotsSubscriptionId = val
 	}
 
-	// // 3. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// // exist, parseAzureEnvironment will return azure.PublicCloud.
+	// 3. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// exist, parseAzureEnvironment will return azure.PublicCloud.
 	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
@@ -116,11 +116,11 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		}
 	}
 
-	// // 5. get SPT
-	// spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
-	// if err != nil {
-	// 	return errors.Wrap(err, "error getting service principal token")
-	// }
+	// 5. get authorizer which contains the JWT to authenticate against Azure's API
+	authorizer, err := auth.NewAuthorizerFromEnvironment()
+	if err != nil {
+		return errors.Wrap(err, "unable to parse environemnt for a valid authentication method")
+	}
 
 	// 6. set up clients
 	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
@@ -128,12 +128,6 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 
 	disksClient.PollingDelay = 5 * time.Second
 	snapsClient.PollingDelay = 5 * time.Second
-
-	// authorizer := autorest.NewBearerAuthorizer(spt)
-	authorizer, err := auth.NewAuthorizerFromEnvironment()
-	if err != nil {
-		return errors.Wrap(err, "unable to parse environemnt for a valid authentication method")
-	}
 
 	disksClient.Authorizer = authorizer
 	snapsClient.Authorizer = authorizer
