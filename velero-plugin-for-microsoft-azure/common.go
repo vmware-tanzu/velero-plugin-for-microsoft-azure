@@ -36,25 +36,6 @@ const (
 	resourceGroupConfigKey = "resourceGroup"
 )
 
-// GetResticEnvVars gets the environment variables that restic
-// relies on (AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY) based
-// on info in the provided object storage location config map.
-func GetResticEnvVars(config map[string]string) (map[string]string, error) {
-	storageAccountKey, _, err := getStorageAccountKey(config)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := getRequiredValues(mapLookup(config), storageAccountConfigKey); err != nil {
-		return nil, errors.Wrap(err, "unable to get all required config values")
-	}
-
-	return map[string]string{
-		"AZURE_ACCOUNT_NAME": config[storageAccountConfigKey],
-		"AZURE_ACCOUNT_KEY":  storageAccountKey,
-	}, nil
-}
-
 func loadEnv() error {
 	envFile := os.Getenv("AZURE_CREDENTIALS_FILE")
 	if envFile == "" {
