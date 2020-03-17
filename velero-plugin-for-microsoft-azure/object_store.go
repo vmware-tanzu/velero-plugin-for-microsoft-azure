@@ -18,8 +18,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +38,11 @@ import (
 const (
 	storageAccountConfigKey = "storageAccount"
 	subscriptionIdConfigKey = "subscriptionId"
+	blockSizeConfigKey      = "blockSizeInBytes"
+
+	// blocks must be less than/equal to 100MB in size
+	// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
+	defaultBlockSize = 100 * 1024 * 1024
 )
 
 type containerGetter interface {
@@ -94,7 +101,8 @@ func (bg *azureBlobGetter) getBlob(bucket, key string) (blob, error) {
 }
 
 type blob interface {
-	CreateBlockBlobFromReader(blob io.Reader, options *storage.PutBlobOptions) error
+	PutBlock(blockID string, chunk []byte, options *storage.PutBlockOptions) error
+	PutBlockList(blocks []storage.Block, options *storage.PutBlockListOptions) error
 	Exists() (bool, error)
 	Get(options *storage.GetBlobOptions) (io.ReadCloser, error)
 	Delete(options *storage.DeleteBlobOptions) error
@@ -105,8 +113,11 @@ type azureBlob struct {
 	blob *storage.Blob
 }
 
-func (b *azureBlob) CreateBlockBlobFromReader(blob io.Reader, options *storage.PutBlobOptions) error {
-	return b.blob.CreateBlockBlobFromReader(blob, options)
+func (b *azureBlob) PutBlock(blockID string, chunk []byte, options *storage.PutBlockOptions) error {
+	return b.blob.PutBlock(blockID, chunk, options)
+}
+func (b *azureBlob) PutBlockList(blocks []storage.Block, options *storage.PutBlockListOptions) error {
+	return b.blob.PutBlockList(blocks, options)
 }
 
 func (b *azureBlob) Exists() (bool, error) {
@@ -126,9 +137,10 @@ func (b *azureBlob) GetSASURI(options *storage.BlobSASOptions) (string, error) {
 }
 
 type ObjectStore struct {
+	log             logrus.FieldLogger
 	containerGetter containerGetter
 	blobGetter      blobGetter
-	log             logrus.FieldLogger
+	blockSize       int
 }
 
 func newObjectStore(logger logrus.FieldLogger) *ObjectStore {
@@ -212,6 +224,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		resourceGroupConfigKey,
 		storageAccountConfigKey,
 		subscriptionIdConfigKey,
+		blockSizeConfigKey,
 	); err != nil {
 		return err
 	}
@@ -235,7 +248,30 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		blobService: &blobClient,
 	}
 
+	o.blockSize = getBlockSize(o.log, config)
+
 	return nil
+}
+
+func getBlockSize(log logrus.FieldLogger, config map[string]string) int {
+	val, ok := config[blockSizeConfigKey]
+	if !ok {
+		// no alternate block size specified in config, so return with the default
+		return defaultBlockSize
+	}
+
+	blockSize, err := strconv.Atoi(val)
+	if err != nil {
+		log.WithError(err).Warnf("Error parsing config.blockSizeInBytes value %v, using default block size of %d", val, defaultBlockSize)
+		return defaultBlockSize
+	}
+
+	if blockSize <= 0 || blockSize > defaultBlockSize {
+		log.WithError(err).Warnf("Value provided for config.blockSizeInBytes (%d) is outside the allowed range of 1 to %d, using default block size of %d", blockSize, defaultBlockSize, defaultBlockSize)
+		return defaultBlockSize
+	}
+
+	return blockSize
 }
 
 func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
@@ -244,7 +280,50 @@ func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 		return err
 	}
 
-	return errors.WithStack(blob.CreateBlockBlobFromReader(body, nil))
+	// Azure requires a blob/object to be chunked if it's larger than 256MB. Since we
+	// don't know ahead of time if the body is over this limit or not, and it would
+	// require reading the entire object into memory to determine the size, we use the
+	// chunking approach for all objects.
+
+	var (
+		block    = make([]byte, o.blockSize)
+		blockIDs []storage.Block
+	)
+
+	for {
+		n, err := body.Read(block)
+		if n > 0 {
+			// blockID needs to be the same length for all blocks, so use a fixed width.
+			// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
+			blockID := fmt.Sprintf("%08d", len(blockIDs))
+
+			o.log.Debugf("Putting block (id=%s) of length %d", blockID, n)
+			if putErr := blob.PutBlock(blockID, block[0:n], nil); putErr != nil {
+				return errors.Wrapf(putErr, "error putting block %s", blockID)
+			}
+
+			blockIDs = append(blockIDs, storage.Block{
+				ID:     blockID,
+				Status: storage.BlockStatusLatest,
+			})
+		}
+
+		// got an io.EOF: we're done reading chunks from the body
+		if err == io.EOF {
+			break
+		}
+		// any other error: bubble it up
+		if err != nil {
+			return errors.Wrap(err, "error reading block from body")
+		}
+	}
+
+	o.log.Debugf("Putting block list %v", blockIDs)
+	if err := blob.PutBlockList(blockIDs, nil); err != nil {
+		return errors.Wrap(err, "error putting block list")
+	}
+
+	return nil
 }
 
 func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
