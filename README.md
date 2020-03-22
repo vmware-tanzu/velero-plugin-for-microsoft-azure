@@ -202,6 +202,29 @@ _(Optional) To integrate Velero with Azure using, you can use storage account ke
 
 1. Set name of the variable with access key stored in `credentials-velero` using `--backup-location-config` option see [additional configurable parameters][7].
 
+### Set storage account access key
+
+_(Optional) To integrate Velero with Azure using, you can use storage account key instead of service principal._
+
+1. Obtain your Azure Storage account access key:
+
+    ```bash
+    AZURE_STORAGE_ACCOUNT_ACCESS_KEY=`az storage account keys list --account-name $AZURE_STORAGE_ACCOUNT_ID --query "[?keyName == 'key1'].value" -o tsv`
+    ```
+
+1. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
+
+```bash
+    cat << EOF  > ./credentials-velero
+    AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
+    AZURE_CLOUD_NAME=AzurePublicCloud
+    EOF
+```
+
+> available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+
+1. Set name of the variable with access key stored in `credentials-velero` using `--backup-location-config` option see [additional configurable parameters][7].
+
 ## Install and start Velero
 
 [Download][4] Velero
