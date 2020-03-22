@@ -166,18 +166,18 @@ _(Optional) When you do not need to create volume snapshots, you can use [storag
 
 1. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
 
-```bash
-    cat << EOF  > ./credentials-velero
-    AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
-    AZURE_TENANT_ID=${AZURE_TENANT_ID}
-    AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
-    AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
-    AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
-    AZURE_CLOUD_NAME=AzurePublicCloud
-    EOF
-```
+    ```bash
+        cat << EOF  > ./credentials-velero
+        AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+        AZURE_TENANT_ID=${AZURE_TENANT_ID}
+        AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+        AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+        AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+        AZURE_CLOUD_NAME=AzurePublicCloud
+        EOF
+    ```
 
-> available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
 
 ### Set storage account access key
 
@@ -191,14 +191,14 @@ _(Optional) To integrate Velero with Azure using, you can use storage account ke
 
 1. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
 
-```bash
-    cat << EOF  > ./credentials-velero
-    AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
-    AZURE_CLOUD_NAME=AzurePublicCloud
-    EOF
-```
+    ```bash
+        cat << EOF  > ./credentials-velero
+        AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
+        AZURE_CLOUD_NAME=AzurePublicCloud
+        EOF
+    ```
 
-> available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
 
 1. Set name of the variable with access key stored in `credentials-velero` using `--backup-location-config` option see [additional configurable parameters][7].
 

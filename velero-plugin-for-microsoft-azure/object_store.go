@@ -36,10 +36,10 @@ import (
 )
 
 const (
-	storageAccountConfigKey = "storageAccount"
+    storageAccountConfigKey          = "storageAccount"
     storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
-	subscriptionIdConfigKey = "subscriptionId"
-	blockSizeConfigKey      = "blockSizeInBytes"
+    subscriptionIdConfigKey          = "subscriptionId"
+    blockSizeConfigKey               = "blockSizeInBytes"
 
 	// blocks must be less than/equal to 100MB in size
 	// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
