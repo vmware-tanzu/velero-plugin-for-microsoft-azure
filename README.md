@@ -133,6 +133,8 @@ of your cluster's resources before continuing._
 
 To integrate Velero with Azure, you must create a Velero-specific [service principal][17].
 
+_(Optional) When you do not need to create volume snapshots, you can use [storage account access key][10] instead._
+
 1. Obtain your Azure Account Subscription ID and Tenant ID:
 
     ```bash
@@ -164,18 +166,41 @@ To integrate Velero with Azure, you must create a Velero-specific [service princ
 
 1. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
 
-```bash
-    cat << EOF  > ./credentials-velero
-    AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
-    AZURE_TENANT_ID=${AZURE_TENANT_ID}
-    AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
-    AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
-    AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
-    AZURE_CLOUD_NAME=AzurePublicCloud
-    EOF
-```
+    ```bash
+        cat << EOF  > ./credentials-velero
+        AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+        AZURE_TENANT_ID=${AZURE_TENANT_ID}
+        AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+        AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+        AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+        AZURE_CLOUD_NAME=AzurePublicCloud
+        EOF
+    ```
 
-> available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+
+### Set storage account access key
+
+_(Optional) To integrate Velero with Azure, you can use storage account key instead of service principal._
+
+1. Obtain your Azure Storage account access key:
+
+    ```bash
+    AZURE_STORAGE_ACCOUNT_ACCESS_KEY=`az storage account keys list --account-name $AZURE_STORAGE_ACCOUNT_ID --query "[?keyName == 'key1'].value" -o tsv`
+    ```
+
+1. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
+
+    ```bash
+        cat << EOF  > ./credentials-velero
+        AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
+        AZURE_CLOUD_NAME=AzurePublicCloud
+        EOF
+    ```
+
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+
+1. Set name of the variable with access key stored in `credentials-velero` using `--backup-location-config` option see [additional configurable parameters][7].
 
 ## Install and start Velero
 
@@ -210,6 +235,7 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [7]: backupstoragelocation.md
 [8]: volumesnapshotlocation.md
 [9]: https://velero.io/docs/customize-installation/
+[10]: #Set-storage-account-access-key
 [11]: https://velero.io/docs/faq/
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
