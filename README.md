@@ -181,7 +181,7 @@ _(Optional) When you do not need to create volume snapshots, you can use [storag
 
 ### Set storage account access key
 
-_(Optional) To integrate Velero with Azure using, you can use storage account key instead of service principal._
+_(Optional) To integrate Velero with Azure, you can use storage account key instead of service principal._
 
 1. Obtain your Azure Storage account access key:
 
