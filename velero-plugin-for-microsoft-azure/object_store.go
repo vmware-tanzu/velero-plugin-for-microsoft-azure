@@ -237,6 +237,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		storageAccountConfigKey,
 		subscriptionIdConfigKey,
 		blockSizeConfigKey,
+		storageAccountKeyEnvVarConfigKey,
 	); err != nil {
 		return err
 	}
