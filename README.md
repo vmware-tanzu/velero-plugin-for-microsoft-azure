@@ -17,6 +17,11 @@ Below is a listing of plugin versions and respective Velero versions that are co
 | v1.0.x          | v1.3.x         |
 | v1.0.x          | v1.2.0         |
 
+## Kubernetes cluster prerequisites
+
+Ensure that the VMs for your agent pool allow Managed Disks. If I/O performance is critical,
+consider using Premium Managed Disks, which are SSD backed.
+
 ## Setup
 
 To set up Velero on Azure, you:
@@ -102,12 +107,16 @@ az storage container create -n $BLOB_CONTAINER --public-access off --account-nam
 
 ## Set permissions for Velero
 
-### Kubernetes cluster prerequisites
+There are two ways Velero can authenticate to Azure: (1) by using a Velero-specific [service principal][17]; or (2) by using a storage account access key.
 
-Ensure that the VMs for your agent pool allow Managed Disks. If I/O performance is critical,
-consider using Premium Managed Disks, which are SSD backed.
+If you plan to use Velero to take Azure snapshots of your persistent volume managed disks, you **must** use the service principal method.
 
-### Get resource group for persistent volume snapshots
+If you don't plan to take Azure disk snapshots, either method is valid.
+
+
+### Option 1: Create service principal
+
+#### Get resource group containing your VMs/disks
 
 _(Optional) If you decided to backup to a different Subscription, make sure you change back to the Subscription
 of your cluster's resources before continuing._
@@ -129,11 +138,7 @@ of your cluster's resources before continuing._
 
     Get your cluster's Resource Group name from the `ResourceGroup` value in the response, and use it to set `$AZURE_RESOURCE_GROUP`.
 
-### Create service principal
-
-To integrate Velero with Azure, you must create a Velero-specific [service principal][17].
-
-_(Optional) When you do not need to create volume snapshots, you can use [storage account access key][10] instead._
+#### Create service principal
 
 1. Obtain your Azure Account Subscription ID and Tenant ID:
 
@@ -164,7 +169,7 @@ _(Optional) When you do not need to create volume snapshots, you can use [storag
     AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
     ```
 
-1. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
+1. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
 
     ```bash
         cat << EOF  > ./credentials-velero
@@ -179,9 +184,9 @@ _(Optional) When you do not need to create volume snapshots, you can use [storag
 
     > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
 
-### Set storage account access key
+### Option 2: Use storage account access key
 
-_(Optional) To integrate Velero with Azure, you can use storage account key instead of service principal._
+_Note: this option is **not valid** if you are planning to take Azure snapshots of your managed disks with Velero._
 
 1. Obtain your Azure Storage account access key:
 
@@ -189,7 +194,7 @@ _(Optional) To integrate Velero with Azure, you can use storage account key inst
     AZURE_STORAGE_ACCOUNT_ACCESS_KEY=`az storage account keys list --account-name $AZURE_STORAGE_ACCOUNT_ID --query "[?keyName == 'key1'].value" -o tsv`
     ```
 
-1. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
+1. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
 
     ```bash
         cat << EOF  > ./credentials-velero
@@ -200,13 +205,13 @@ _(Optional) To integrate Velero with Azure, you can use storage account key inst
 
     > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
 
-1. Set name of the variable with access key stored in `credentials-velero` using `--backup-location-config` option see [additional configurable parameters][7].
-
 ## Install and start Velero
 
 [Download][4] Velero
 
 Install Velero, including all prerequisites, into the cluster and start the deployment. This will create a namespace called `velero`, and place a deployment named `velero` in it.
+
+**If using service principal:**
 
 ```bash
 velero install \
@@ -216,6 +221,18 @@ velero install \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
+```
+
+**If using storage account access key and no Azure snapshots:**
+
+```bash
+velero install \
+    --provider azure \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.0.1 \
+    --bucket $BLOB_CONTAINER \
+    --secret-file ./credentials-velero \
+    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --use-volume-snapshots=false
 ```
 
 Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
@@ -235,7 +252,6 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [7]: backupstoragelocation.md
 [8]: volumesnapshotlocation.md
 [9]: https://velero.io/docs/customize-installation/
-[10]: #Set-storage-account-access-key
 [11]: https://velero.io/docs/faq/
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
