@@ -38,8 +38,8 @@ spec:
 
     # Name of the environment variable in $AZURE_CREDENTIALS_FILE that contains storage account key for this backup storage location.
     #
-    # Optional.
-    storageAccountKeyEnvVar: MY_BACKUP_STORAGE_ACCOUNT_KEY
+    # Required if using a storage account access key to authenticate rather than a service principal.
+    storageAccountKeyEnvVar: MY_BACKUP_STORAGE_ACCOUNT_KEY_ENV_VAR
 
     # ID of the subscription for this backup storage location.
     #

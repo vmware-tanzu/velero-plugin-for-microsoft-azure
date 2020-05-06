@@ -36,10 +36,10 @@ import (
 )
 
 const (
-    storageAccountConfigKey          = "storageAccount"
-    storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
-    subscriptionIdConfigKey          = "subscriptionId"
-    blockSizeConfigKey               = "blockSizeInBytes"
+	storageAccountConfigKey          = "storageAccount"
+	storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
+	subscriptionIdConfigKey          = "subscriptionId"
+	blockSizeConfigKey               = "blockSizeInBytes"
 
 	// blocks must be less than/equal to 100MB in size
 	// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
@@ -161,12 +161,12 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 2. get storage key from secret using key config[storageAccountKeyEnvVarConfigKey]. If the config does not
-	// exist, continue obtaining it using API
-    if secretKeyEnvVar := config[storageAccountKeyEnvVarConfigKey]; secretKeyEnvVar != "" {
+	// 2. get storage account key from env var whose name is in config[storageAccountKeyEnvVarConfigKey].
+	// If the config does not exist, continue obtaining the storage key using API
+	if secretKeyEnvVar := config[storageAccountKeyEnvVarConfigKey]; secretKeyEnvVar != "" {
 		storageKey := os.Getenv(secretKeyEnvVar)
 		if storageKey == "" {
-			return "", env, errors.Errorf("no storage key secret with key %s found", secretKeyEnvVar)
+			return "", env, errors.Errorf("no storage account key found in env var %s", secretKeyEnvVar)
 		}
 
 		return storageKey, env, nil
@@ -208,7 +208,7 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 		return "", env, errors.New("No storage keys found")
 	}
 
-    var storageKey string
+	var storageKey string
 	for _, key := range *res.Keys {
 		// uppercase both strings for comparison because the ListKeys call returns e.g. "FULL" but
 		// the storagemgmt.Full constant in the SDK is defined as "Full".
