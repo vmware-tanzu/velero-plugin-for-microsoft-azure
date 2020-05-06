@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/tracing"
 	"net/http"
 )
 
@@ -34,7 +35,9 @@ func NewVirtualMachineImagesClient(subscriptionID string) VirtualMachineImagesCl
 	return NewVirtualMachineImagesClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewVirtualMachineImagesClientWithBaseURI creates an instance of the VirtualMachineImagesClient client.
+// NewVirtualMachineImagesClientWithBaseURI creates an instance of the VirtualMachineImagesClient client using a custom
+// endpoint.  Use this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure
+// stack).
 func NewVirtualMachineImagesClientWithBaseURI(baseURI string, subscriptionID string) VirtualMachineImagesClient {
 	return VirtualMachineImagesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -47,6 +50,16 @@ func NewVirtualMachineImagesClientWithBaseURI(baseURI string, subscriptionID str
 // skus - a valid image SKU.
 // version - a valid image SKU version.
 func (client VirtualMachineImagesClient) Get(ctx context.Context, location string, publisherName string, offer string, skus string, version string) (result VirtualMachineImage, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualMachineImagesClient.Get")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.GetPreparer(ctx, location, publisherName, offer, skus, version)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "compute.VirtualMachineImagesClient", "Get", nil, "Failure preparing request")
@@ -95,8 +108,7 @@ func (client VirtualMachineImagesClient) GetPreparer(ctx context.Context, locati
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachineImagesClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -118,9 +130,19 @@ func (client VirtualMachineImagesClient) GetResponder(resp *http.Response) (resu
 // publisherName - a valid image publisher.
 // offer - a valid image publisher offer.
 // skus - a valid image SKU.
-// filter - the filter to apply on the operation.
-func (client VirtualMachineImagesClient) List(ctx context.Context, location string, publisherName string, offer string, skus string, filter string, top *int32, orderby string) (result ListVirtualMachineImageResource, err error) {
-	req, err := client.ListPreparer(ctx, location, publisherName, offer, skus, filter, top, orderby)
+// expand - the expand expression to apply on the operation.
+func (client VirtualMachineImagesClient) List(ctx context.Context, location string, publisherName string, offer string, skus string, expand string, top *int32, orderby string) (result ListVirtualMachineImageResource, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualMachineImagesClient.List")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	req, err := client.ListPreparer(ctx, location, publisherName, offer, skus, expand, top, orderby)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "compute.VirtualMachineImagesClient", "List", nil, "Failure preparing request")
 		return
@@ -142,7 +164,7 @@ func (client VirtualMachineImagesClient) List(ctx context.Context, location stri
 }
 
 // ListPreparer prepares the List request.
-func (client VirtualMachineImagesClient) ListPreparer(ctx context.Context, location string, publisherName string, offer string, skus string, filter string, top *int32, orderby string) (*http.Request, error) {
+func (client VirtualMachineImagesClient) ListPreparer(ctx context.Context, location string, publisherName string, offer string, skus string, expand string, top *int32, orderby string) (*http.Request, error) {
 	pathParameters := map[string]interface{}{
 		"location":       autorest.Encode("path", location),
 		"offer":          autorest.Encode("path", offer),
@@ -155,8 +177,8 @@ func (client VirtualMachineImagesClient) ListPreparer(ctx context.Context, locat
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
-	if len(filter) > 0 {
-		queryParameters["$filter"] = autorest.Encode("query", filter)
+	if len(expand) > 0 {
+		queryParameters["$expand"] = autorest.Encode("query", expand)
 	}
 	if top != nil {
 		queryParameters["$top"] = autorest.Encode("query", *top)
@@ -176,8 +198,7 @@ func (client VirtualMachineImagesClient) ListPreparer(ctx context.Context, locat
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachineImagesClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -198,6 +219,16 @@ func (client VirtualMachineImagesClient) ListResponder(resp *http.Response) (res
 // location - the name of a supported Azure region.
 // publisherName - a valid image publisher.
 func (client VirtualMachineImagesClient) ListOffers(ctx context.Context, location string, publisherName string) (result ListVirtualMachineImageResource, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualMachineImagesClient.ListOffers")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.ListOffersPreparer(ctx, location, publisherName)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "compute.VirtualMachineImagesClient", "ListOffers", nil, "Failure preparing request")
@@ -243,8 +274,7 @@ func (client VirtualMachineImagesClient) ListOffersPreparer(ctx context.Context,
 // ListOffersSender sends the ListOffers request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachineImagesClient) ListOffersSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListOffersResponder handles the response to the ListOffers request. The method always
@@ -264,6 +294,16 @@ func (client VirtualMachineImagesClient) ListOffersResponder(resp *http.Response
 // Parameters:
 // location - the name of a supported Azure region.
 func (client VirtualMachineImagesClient) ListPublishers(ctx context.Context, location string) (result ListVirtualMachineImageResource, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualMachineImagesClient.ListPublishers")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.ListPublishersPreparer(ctx, location)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "compute.VirtualMachineImagesClient", "ListPublishers", nil, "Failure preparing request")
@@ -308,8 +348,7 @@ func (client VirtualMachineImagesClient) ListPublishersPreparer(ctx context.Cont
 // ListPublishersSender sends the ListPublishers request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachineImagesClient) ListPublishersSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListPublishersResponder handles the response to the ListPublishers request. The method always
@@ -331,6 +370,16 @@ func (client VirtualMachineImagesClient) ListPublishersResponder(resp *http.Resp
 // publisherName - a valid image publisher.
 // offer - a valid image publisher offer.
 func (client VirtualMachineImagesClient) ListSkus(ctx context.Context, location string, publisherName string, offer string) (result ListVirtualMachineImageResource, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/VirtualMachineImagesClient.ListSkus")
+		defer func() {
+			sc := -1
+			if result.Response.Response != nil {
+				sc = result.Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
 	req, err := client.ListSkusPreparer(ctx, location, publisherName, offer)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "compute.VirtualMachineImagesClient", "ListSkus", nil, "Failure preparing request")
@@ -377,8 +426,7 @@ func (client VirtualMachineImagesClient) ListSkusPreparer(ctx context.Context, l
 // ListSkusSender sends the ListSkus request. The method will close the
 // http.Response Body if it receives an error.
 func (client VirtualMachineImagesClient) ListSkusSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListSkusResponder handles the response to the ListSkus request. The method always
