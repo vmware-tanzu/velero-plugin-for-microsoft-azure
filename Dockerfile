@@ -15,6 +15,10 @@
 FROM golang:1.13-buster AS build
 COPY . /go/src/velero-plugin-for-microsoft-azure
 WORKDIR /go/src/velero-plugin-for-microsoft-azure
+<<<<<<< HEAD
+=======
+RUN go mod download
+>>>>>>> update build and Dockerfile to use go modules
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
 
 
