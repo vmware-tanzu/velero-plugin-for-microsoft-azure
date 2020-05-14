@@ -30,4 +30,5 @@ jobs:
 
     - name: Publish container image
       run: |
+        docker login quay.io -u ${{ secrets.DOCKER_USER }} -p ${{ secrets.DOCKER_PASSWORD }}
         ./hack/docker-push.sh

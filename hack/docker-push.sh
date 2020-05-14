@@ -56,7 +56,7 @@ elif [[ "$triggeredBy" == "tags" ]]; then
     TAG=$(echo $GITHUB_REF | cut -d / -f 3)
 fi
 
-if [[ "$BRANCH" == "master" ]]; then
+if [[ "$BRANCH" == "github-actions" ]]; then
     VERSION="$BRANCH"
 elif [[ ! -z "$TAG" ]]; then
     # Tags aren't fetched by Travis on checkout, and we don't need them for master
@@ -65,18 +65,13 @@ elif [[ ! -z "$TAG" ]]; then
     highest_release
     VERSION="$TAG"
 else
-    echo "If we're not on master and we're not building a tag, exit early."
-    # Debugging info
-    echo "Highest tag found: $HIGHEST"
-    echo "BRANCH: $BRANCH"
-    echo "TAG: $TAG"
-    echo "TAG_LATEST: $TAG_LATEST"
+    echo "We're not on master and we're not building a tag, exit early."
     exit 0
 fi
 
 # Assume we're not tagging `latest` by default, and never on master.
 TAG_LATEST=false
-if [[ "$BRANCH" == "master" ]]; then
+if [[ "$BRANCH" == "github-actions" ]]; then
     echo "Building master, not tagging latest."
 elif [[ "$TAG" == "$HIGHEST" ]]; then
     TAG_LATEST=true
@@ -90,4 +85,4 @@ echo "TAG_LATEST: $TAG_LATEST"
 
 echo "Building and pushing container images."
 
-VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" make container push
+VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" IMAGE=quay.io/ashish_amarnath/velero-plugin-for-microsoft-azure make container push
