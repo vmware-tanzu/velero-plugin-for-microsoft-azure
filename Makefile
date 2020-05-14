@@ -45,15 +45,18 @@ test:
 ci: verify-modules test
 
 # container builds a Docker image containing the binary.
+.PHONY: container
 container:
 	docker build -t $(IMAGE):$(VERSION) .
 
 # push pushes the Docker image to its registry.
-push:
-	@docker push $(IMAGE):$(VERSION)
+.PHONY: push
+push: container
+	echo docker push $(IMAGE):$(VERSION)
+	echo $(TAG_LATEST)
 ifeq ($(TAG_LATEST), true)
-	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
+	echo docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
+	echo docker push $(IMAGE):latest
 endif
 
 # build-dirs creates the necessary directories for a build in the local environment.
