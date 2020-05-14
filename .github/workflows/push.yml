@@ -40,8 +40,7 @@ jobs:
 
     - name: Set TAG_LATEST
       id: set_tag_latest
-      run: |
-        if: ${{ steps.get_highest_release }} == $${{ steps.get_tag.outputs.TAG }}
+      if: ${{ steps.get_highest_release }} == $${{ steps.get_tag.outputs.TAG }}
         echo ::set-output name=TAG_LATEST::$(echo true)
 
     - name: Publish container image
