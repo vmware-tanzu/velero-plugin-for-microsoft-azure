@@ -45,8 +45,6 @@ if [[ "${GOOS}" = "windows" ]]; then
   OUTPUT="${OUTPUT}.exe"
 fi
 
-go mod download
-
 go build \
     -o ${OUTPUT} \
     -installsuffix "static" \
