@@ -1,1 +1,0 @@
-chunk objects when uploading to object storage in order to support objects larger than 256MB
