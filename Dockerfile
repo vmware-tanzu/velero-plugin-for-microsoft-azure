@@ -13,10 +13,8 @@
 # limitations under the License.
 
 FROM golang:1.13-buster AS build
-WORKDIR /go/src/github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
-# copy vendor in separately so the layer can be cached if the contents don't change
-COPY vendor vendor
-COPY velero-plugin-for-microsoft-azure velero-plugin-for-microsoft-azure
+COPY . /go/src/velero-plugin-for-microsoft-azure
+WORKDIR /go/src/velero-plugin-for-microsoft-azure
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
 
 
