@@ -1,3 +1,6 @@
+
+[![Build Status][101]][102]
+
 # Velero plugins for Microsoft Azure
 
 ## Overview
@@ -258,3 +261,5 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
 [22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
+[101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Master%20CI/badge.svg
+[102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Master+CI"
