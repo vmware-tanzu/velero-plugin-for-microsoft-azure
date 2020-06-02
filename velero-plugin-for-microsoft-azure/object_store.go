@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2017, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,10 +25,10 @@ import (
 	"strings"
 	"time"
 
-	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage"
+	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
 	"github.com/Azure/azure-sdk-for-go/storage"
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -38,7 +38,7 @@ import (
 const (
 	storageAccountConfigKey          = "storageAccount"
 	storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
-	subscriptionIdConfigKey          = "subscriptionId"
+	subscriptionIDConfigKey          = "subscriptionId"
 	blockSizeConfigKey               = "blockSizeInBytes"
 
 	// blocks must be less than/equal to 100MB in size
@@ -148,20 +148,30 @@ func newObjectStore(logger logrus.FieldLogger) *ObjectStore {
 	return &ObjectStore{log: logger}
 }
 
+// getSubscriptionID gets the subscription ID from the 'config' map if it contains
+// it, else from the AZURE_SUBSCRIPTION_ID environment variable.
+func getSubscriptionID(config map[string]string) string {
+	if subscriptionID := config[subscriptionIDConfigKey]; subscriptionID != "" {
+		return subscriptionID
+	}
+
+	return os.Getenv(subscriptionIDEnvVar)
+}
+
 func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
 	// load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
 	if err := loadEnv(); err != nil {
 		return "", nil, err
 	}
 
-	// 1. get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
 	// exist, parseAzureEnvironment will return azure.PublicCloud.
 	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 2. get storage account key from env var whose name is in config[storageAccountKeyEnvVarConfigKey].
+	// get storage account key from env var whose name is in config[storageAccountKeyEnvVarConfigKey].
 	// If the config does not exist, continue obtaining the storage key using API
 	if secretKeyEnvVar := config[storageAccountKeyEnvVarConfigKey]; secretKeyEnvVar != "" {
 		storageKey := os.Getenv(secretKeyEnvVar)
@@ -172,35 +182,33 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 		return storageKey, env, nil
 	}
 
-	// 3. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
-	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
-	if err != nil {
-		return "", nil, errors.Wrap(err, "unable to get all required environment variables")
+	// get subscription ID from object store config or AZURE_SUBSCRIPTION_ID environment variable
+	subscriptionID := getSubscriptionID(config)
+	if subscriptionID == "" {
+		return "", nil, errors.New("azure subscription ID not found in object store's config or in environment variable")
 	}
 
-	// 4. check whether a different subscription ID was set for backups in config["subscriptionId"]
-	subscriptionId := envVars[subscriptionIDEnvVar]
-	if val := config[subscriptionIdConfigKey]; val != "" {
-		subscriptionId = val
-	}
-
-	// 5. we need config["resourceGroup"], config["storageAccount"]
+	// we need config["resourceGroup"], config["storageAccount"]
 	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
 		return "", env, errors.Wrap(err, "unable to get all required config values")
 	}
 
-	// 6. get SPT
-	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
+	// get authorizer from environment in the following order:
+	// 1. client credentials (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
+	// 2. client certificate (AZURE_CERTIFICATE_PATH, AZURE_CERTIFICATE_PASSWORD)
+	// 3. username and password (AZURE_USERNAME, AZURE_PASSWORD)
+	// 4. MSI (managed service identity)
+	authorizer, err := auth.NewAuthorizerFromEnvironment()
 	if err != nil {
-		return "", env, errors.Wrap(err, "error getting service principal token")
+		return "", nil, errors.Wrap(err, "error getting authorizer from environment")
 	}
 
-	// 7. get storageAccountsClient
-	storageAccountsClient := storagemgmt.NewAccountsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionId)
-	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
+	// get storageAccountsClient
+	storageAccountsClient := storagemgmt.NewAccountsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
+	storageAccountsClient.Authorizer = authorizer
 
-	// 8. get storage key
-	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey])
+	// get storage key
+	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey], storagemgmt.Kerb)
 	if err != nil {
 		return "", env, errors.WithStack(err)
 	}
@@ -235,7 +243,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	if err := veleroplugin.ValidateObjectStoreConfigKeys(config,
 		resourceGroupConfigKey,
 		storageAccountConfigKey,
-		subscriptionIdConfigKey,
+		subscriptionIDConfigKey,
 		blockSizeConfigKey,
 		storageAccountKeyEnvVarConfigKey,
 	); err != nil {

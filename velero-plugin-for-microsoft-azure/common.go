@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,17 +20,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 )
 
 const (
-	tenantIDEnvVar       = "AZURE_TENANT_ID"
 	subscriptionIDEnvVar = "AZURE_SUBSCRIPTION_ID"
-	clientIDEnvVar       = "AZURE_CLIENT_ID"
-	clientSecretEnvVar   = "AZURE_CLIENT_SECRET"
 	cloudNameEnvVar      = "AZURE_CLOUD_NAME"
 
 	resourceGroupConfigKey = "resourceGroup"
@@ -58,15 +54,6 @@ func parseAzureEnvironment(cloudName string) (*azure.Environment, error) {
 
 	env, err := azure.EnvironmentFromName(cloudName)
 	return &env, errors.WithStack(err)
-}
-
-func newServicePrincipalToken(tenantID, clientID, clientSecret string, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
-	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, tenantID)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting OAuthConfig")
-	}
-
-	return adal.NewServicePrincipalToken(*oauthConfig, clientID, clientSecret, env.ResourceManagerEndpoint)
 }
 
 func getRequiredValues(getValue func(string) string, keys ...string) (map[string]string, error) {

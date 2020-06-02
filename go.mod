@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.9.6
-	github.com/Azure/go-autorest/autorest/adal v0.8.2
+	github.com/Azure/go-autorest/autorest/azure/auth v0.4.2
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/hashicorp/go-hclog v0.9.2 // indirect
