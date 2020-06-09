@@ -31,6 +31,7 @@ consider using Premium Managed Disks, which are SSD backed.
 To set up Velero on Azure, you:
 
 - [Create an Azure storage account and blob container][1]
+- [Get the resource group containing your VMs and disks][4]
 - [Set permissions for Velero][2]
 - [Install and start Velero][3]
 
@@ -109,18 +110,7 @@ BLOB_CONTAINER=velero
 az storage container create -n $BLOB_CONTAINER --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
 ```
 
-## Set permissions for Velero
-
-There are two ways Velero can authenticate to Azure: (1) by using a Velero-specific [service principal][17]; or (2) by using a storage account access key.
-
-If you plan to use Velero to take Azure snapshots of your persistent volume managed disks, you **must** use the service principal method.
-
-If you don't plan to take Azure disk snapshots, either method is valid.
-
-
-### Option 1: Create service principal
-
-#### Get resource group containing your VMs/disks
+## Get resource group containing your VMs and disks
 
 _(Optional) If you decided to backup to a different Subscription, make sure you change back to the Subscription
 of your cluster's resources before continuing._
@@ -141,6 +131,17 @@ of your cluster's resources before continuing._
     ```
 
     Get your cluster's Resource Group name from the `ResourceGroup` value in the response, and use it to set `$AZURE_RESOURCE_GROUP`.
+
+## Set permissions for Velero
+
+There are several ways Velero can authenticate to Azure: (1) by using a Velero-specific [service principal][17]; (2) by using [AAD Pod Identity][20]; or (3) by using a storage account access key.
+
+If you plan to use Velero to take Azure snapshots of your persistent volume managed disks, you **must** use the service principal or AAD Pod Identity method.
+
+If you don't plan to take Azure disk snapshots, any method is valid.
+
+
+### Option 1: Create service principal
 
 #### Create service principal
 
@@ -188,7 +189,81 @@ of your cluster's resources before continuing._
 
     > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
 
-### Option 2: Use storage account access key
+### Option 2: Use AAD Pod Identity
+
+These instructions have been adapted from the [aad-pod-identity documentation][21].
+
+Before proceeding, ensure that you have installed and configured [aad-pod-identity][20] for your cluster.
+
+#### Create identity
+
+1. Obtain your Azure Account Subscription ID:
+
+    ```bash
+    AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
+    ```
+
+1. Create an identity for Velero:
+
+    ```bash
+    export IDENTITY_NAME=velero
+
+    az identity create \
+        --subscription $AZURE_SUBSCRIPTION_ID \
+        --resource-group $AZURE_RESOURCE_GROUP \
+        --name $IDENTITY_NAME
+
+    export IDENTITY_CLIENT_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $SUBSCRIPTION_ID --query clientId -otsv)"
+    export IDENTITY_RESOURCE_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $SUBSCRIPTION_ID --query id -otsv)"    
+    ```
+    
+    If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique identity name per cluster rather than the default `velero`.
+
+1. Assign the identity a role:
+
+    ```bash
+    export IDENTITY_ASSIGNMENT_ID="$(az role assignment create --role Contributor --assignee $IDENTITY_CLIENT_ID --scope /subscriptions/$SUBSCRIPTION_ID --query id -otsv)"
+    ```
+
+1. In the cluster, create an `AzureIdentity` and `AzureIdentityBinding`:
+
+    ```bash
+    cat <<EOF | kubectl apply -f -
+    apiVersion: "aadpodidentity.k8s.io/v1"
+    kind: AzureIdentity
+    metadata:
+      name: $IDENTITY_NAME
+    spec:
+      type: 0
+      resourceID: $IDENTITY_RESOURCE_ID
+      clientID: $IDENTITY_CLIENT_ID
+    EOF
+
+    cat <<EOF | kubectl apply -f -
+    apiVersion: "aadpodidentity.k8s.io/v1"
+    kind: AzureIdentityBinding
+    metadata:
+      name: $IDENTITY_NAME-binding
+    spec:
+      azureIdentity: $IDENTITY_NAME
+      selector: $IDENTITY_NAME
+    EOF
+    ```
+
+1. Create a file that contains all the relevant environment variables:
+
+    ```bash
+        cat << EOF  > ./credentials-velero
+        AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+        AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+        AZURE_CLOUD_NAME=AzurePublicCloud
+        EOF
+    ```
+
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+
+
+### Option 3: Use storage account access key
 
 _Note: this option is **not valid** if you are planning to take Azure snapshots of your managed disks with Velero._
 
@@ -211,11 +286,11 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
 
 ## Install and start Velero
 
-[Download][4] Velero
+[Download][6] Velero
 
 Install Velero, including all prerequisites, into the cluster and start the deployment. This will create a namespace called `velero`, and place a deployment named `velero` in it.
 
-**If using service principal:**
+**If using service principal or AAD Pod Identity:**
 
 ```bash
 velero install \
@@ -226,6 +301,8 @@ velero install \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
+
+If you're using **AAD Pod Identity**, you now need to add the `aadpodidbinding=$IDENTITY_NAME` label to the Velero pod(s), preferably through the Deployment's pod template.  
 
 **If using storage account access key and no Azure snapshots:**
 
@@ -252,7 +329,8 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [1]: #Create-Azure-storage-account-and-blob-container
 [2]: #Set-permissions-for-Velero
 [3]: #Install-and-start-Velero
-[4]: https://velero.io/docs/install-overview/
+[4]: #Get-resource-group-containing-your-VMs-and-disks
+[6]: https://velero.io/docs/install-overview/
 [7]: backupstoragelocation.md
 [8]: volumesnapshotlocation.md
 [9]: https://velero.io/docs/customize-installation/
@@ -260,6 +338,8 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
+[20]: https://github.com/Azure/aad-pod-identity
+[21]: https://github.com/Azure/aad-pod-identity#demo
 [22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Master%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Master+CI"

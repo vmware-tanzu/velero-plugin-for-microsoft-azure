@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2017, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,8 +25,9 @@ import (
 	"strings"
 	"time"
 
-	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
+	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -72,7 +73,7 @@ func newVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := veleroplugin.ValidateVolumeSnapshotterConfigKeys(config, resourceGroupConfigKey, apiTimeoutConfigKey, subscriptionIdConfigKey); err != nil {
+	if err := veleroplugin.ValidateVolumeSnapshotterConfigKeys(config, resourceGroupConfigKey, apiTimeoutConfigKey, subscriptionIDConfigKey); err != nil {
 		return err
 	}
 
@@ -81,30 +82,30 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		return err
 	}
 
-	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
-	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, resourceGroupEnvVar)
+	// we need AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
+	envVars, err := getRequiredValues(os.Getenv, subscriptionIDEnvVar, resourceGroupEnvVar)
 	if err != nil {
 		return errors.Wrap(err, "unable to get all required environment variables")
 	}
 
-	// 2. set a different subscriptionId for snapshots if specified
-	snapshotsSubscriptionId := envVars[subscriptionIDEnvVar]
-	if val := config[subscriptionIdConfigKey]; val != "" {
+	// set a different subscriptionId for snapshots if specified
+	snapshotsSubscriptionID := envVars[subscriptionIDEnvVar]
+	if val := config[subscriptionIDConfigKey]; val != "" {
 		// if subscription was set in config, it is required to also set the resource group
 		if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey); err != nil {
 			return errors.Wrap(err, "resourceGroup not specified, but is a requirement when backing up to a different subscription")
 		}
-		snapshotsSubscriptionId = val
+		snapshotsSubscriptionID = val
 	}
 
-	// 3. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
 	// exist, parseAzureEnvironment will return azure.PublicCloud.
 	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 4. if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
+	// if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
 	var apiTimeout time.Duration
 	if val := config[apiTimeoutConfigKey]; val == "" {
 		apiTimeout = 2 * time.Minute
@@ -115,27 +116,30 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		}
 	}
 
-	// 5. get SPT
-	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
+	// get authorizer from environment in the following order:
+	// 1. client credentials (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
+	// 2. client certificate (AZURE_CERTIFICATE_PATH, AZURE_CERTIFICATE_PASSWORD)
+	// 3. username and password (AZURE_USERNAME, AZURE_PASSWORD)
+	// 4. MSI (managed service identity)
+	authorizer, err := auth.NewAuthorizerFromEnvironment()
 	if err != nil {
-		return errors.Wrap(err, "error getting service principal token")
+		return errors.Wrap(err, "error getting authorizer from environment")
 	}
 
-	// 6. set up clients
+	// set up clients
 	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
-	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionId)
+	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionID)
 
 	disksClient.PollingDelay = 5 * time.Second
 	snapsClient.PollingDelay = 5 * time.Second
 
-	authorizer := autorest.NewBearerAuthorizer(spt)
 	disksClient.Authorizer = authorizer
 	snapsClient.Authorizer = authorizer
 
 	b.disks = &disksClient
 	b.snaps = &snapsClient
 	b.disksSubscription = envVars[subscriptionIDEnvVar]
-	b.snapsSubscription = snapshotsSubscriptionId
+	b.snapsSubscription = snapshotsSubscriptionID
 	b.disksResourceGroup = envVars[resourceGroupEnvVar]
 	b.snapsResourceGroup = config[resourceGroupConfigKey]
 
@@ -175,7 +179,7 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 			},
 		},
 		Sku: &disk.DiskSku{
-			Name: disk.StorageAccountTypes(volumeType),
+			Name: disk.DiskStorageAccountTypes(volumeType),
 		},
 		Tags: snapshotInfo.Tags,
 	}
@@ -236,7 +240,7 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 
 	snap := disk.Snapshot{
 		Name: &snapshotName,
-		DiskProperties: &disk.DiskProperties{
+		SnapshotProperties: &disk.SnapshotProperties{
 			CreationData: &disk.CreationData{
 				CreateOption:     disk.Copy,
 				SourceResourceID: &fullDiskName,
