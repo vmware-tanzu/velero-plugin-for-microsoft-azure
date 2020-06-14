@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,7 +42,8 @@ import (
 const (
 	resourceGroupEnvVar = "AZURE_RESOURCE_GROUP"
 
-	apiTimeoutConfigKey = "apiTimeout"
+	apiTimeoutConfigKey       = "apiTimeout"
+	snapsIncrementalConfigKey = "incremental"
 
 	snapshotsResource = "snapshots"
 	disksResource     = "disks"
@@ -55,6 +57,7 @@ type VolumeSnapshotter struct {
 	snapsSubscription  string
 	disksResourceGroup string
 	snapsResourceGroup string
+	snapsIncremental   *bool
 	apiTimeout         time.Duration
 }
 
@@ -73,7 +76,12 @@ func newVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := veleroplugin.ValidateVolumeSnapshotterConfigKeys(config, resourceGroupConfigKey, apiTimeoutConfigKey, subscriptionIDConfigKey); err != nil {
+	if err := veleroplugin.ValidateVolumeSnapshotterConfigKeys(config,
+		resourceGroupConfigKey,
+		apiTimeoutConfigKey,
+		subscriptionIDConfigKey,
+		snapsIncrementalConfigKey,
+	); err != nil {
 		return err
 	}
 
@@ -126,6 +134,18 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		return errors.Wrap(err, "error getting authorizer from environment")
 	}
 
+	// if config["snapsIncrementalConfigKey"] is empty, default to nil; otherwise, parse it
+	var snapshotsIncremental *bool
+	if val := config[snapsIncrementalConfigKey]; val != "" {
+		parseIncremental, err := strconv.ParseBool(val)
+		if err != nil {
+			return errors.Wrapf(err, "unable to parse value %q for config key %q (expected a boolean value)", val, snapsIncrementalConfigKey)
+		}
+		snapshotsIncremental = &parseIncremental
+	} else {
+		snapshotsIncremental = nil
+	}
+
 	// set up clients
 	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
 	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionID)
@@ -151,6 +171,8 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	}
 
 	b.apiTimeout = apiTimeout
+
+	b.snapsIncremental = snapshotsIncremental
 
 	return nil
 }
@@ -245,6 +267,7 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 				CreateOption:     disk.Copy,
 				SourceResourceID: &fullDiskName,
 			},
+			Incremental: b.snapsIncremental,
 		},
 		Tags:     getSnapshotTags(tags, diskInfo.Tags),
 		Location: diskInfo.Location,
