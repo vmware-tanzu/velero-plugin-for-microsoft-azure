@@ -13,22 +13,29 @@ spec:
   #
   # Required.
   provider: velero.io/azure
-  
+
   config:
     # How long to wait for an Azure API request to complete before timeout.
     #
     # Optional (defaults to 2m0s).
     apiTimeout: 5m
 
-    # The name of the resource group where volume snapshots should be stored, if different 
+    # The name of the resource group where volume snapshots should be stored, if different
     # from the cluster's resource group.
-    # 
+    #
     # Optional.
     resourceGroup: my-rg
 
-    # The ID of the subscription where volume snapshots should be stored, if different 
+    # The ID of the subscription where volume snapshots should be stored, if different
     # from the cluster's subscription. Requires "resourceGroup" to also be set.
-    # 
+    #
     # Optional.
     subscriptionId: alt-subscription
+
+    # Azure offers the option to take full or incremental snapshots of managed disks.
+    # - Set this parameter to true, to take incremental snapshots.
+    # - If the parameter is omitted or set to false, full snapshots are taken (default).
+    #
+    # Optional.
+    incremental: "<false|true>"
 ```
