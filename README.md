@@ -341,5 +341,5 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [20]: https://github.com/Azure/aad-pod-identity
 [21]: https://github.com/Azure/aad-pod-identity#demo
 [22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
-[101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Master%20CI/badge.svg
-[102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Master+CI"
+[101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
+[102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"

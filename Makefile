@@ -17,7 +17,7 @@ BIN := velero-plugin-for-microsoft-azure
 
 REGISTRY 	?= velero
 IMAGE 		?= $(REGISTRY)/velero-plugin-for-microsoft-azure
-VERSION 	?= master
+VERSION 	?= main 
 
 # Which architecture to build.
 # if the 'local' rule is being run, detect the GOOS/GOARCH from 'go env'
