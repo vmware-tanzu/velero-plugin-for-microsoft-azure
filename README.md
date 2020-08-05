@@ -177,14 +177,14 @@ If you don't plan to take Azure disk snapshots, any method is valid.
 1. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
 
     ```bash
-        cat << EOF  > ./credentials-velero
-        AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
-        AZURE_TENANT_ID=${AZURE_TENANT_ID}
-        AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
-        AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
-        AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
-        AZURE_CLOUD_NAME=AzurePublicCloud
-        EOF
+    cat << EOF  > ./credentials-velero
+    AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+    AZURE_TENANT_ID=${AZURE_TENANT_ID}
+    AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+    AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+    AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+    AZURE_CLOUD_NAME=AzurePublicCloud
+    EOF
     ```
 
     > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
@@ -253,11 +253,11 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
 1. Create a file that contains all the relevant environment variables:
 
     ```bash
-        cat << EOF  > ./credentials-velero
-        AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
-        AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
-        AZURE_CLOUD_NAME=AzurePublicCloud
-        EOF
+    cat << EOF  > ./credentials-velero
+    AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+    AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+    AZURE_CLOUD_NAME=AzurePublicCloud
+    EOF
     ```
 
     > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
@@ -276,10 +276,10 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
 1. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
 
     ```bash
-        cat << EOF  > ./credentials-velero
-        AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
-        AZURE_CLOUD_NAME=AzurePublicCloud
-        EOF
+    cat << EOF  > ./credentials-velero
+    AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
+    AZURE_CLOUD_NAME=AzurePublicCloud
+    EOF
     ```
 
     > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
