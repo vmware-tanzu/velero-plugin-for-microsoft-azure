@@ -213,8 +213,8 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
         --resource-group $AZURE_RESOURCE_GROUP \
         --name $IDENTITY_NAME
 
-    export IDENTITY_CLIENT_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $SUBSCRIPTION_ID --query clientId -otsv)"
-    export IDENTITY_RESOURCE_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $SUBSCRIPTION_ID --query id -otsv)"    
+    export IDENTITY_CLIENT_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $AZURE_SUBSCRIPTION_ID --query clientId -otsv)"
+    export IDENTITY_RESOURCE_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $AZURE_SUBSCRIPTION_ID --query id -otsv)"    
     ```
     
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique identity name per cluster rather than the default `velero`.
@@ -222,7 +222,7 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
 1. Assign the identity a role:
 
     ```bash
-    export IDENTITY_ASSIGNMENT_ID="$(az role assignment create --role Contributor --assignee $IDENTITY_CLIENT_ID --scope /subscriptions/$SUBSCRIPTION_ID --query id -otsv)"
+    export IDENTITY_ASSIGNMENT_ID="$(az role assignment create --role Contributor --assignee $IDENTITY_CLIENT_ID --scope /subscriptions/$AZURE_SUBSCRIPTION_ID --query id -otsv)"
     ```
 
 1. In the cluster, create an `AzureIdentity` and `AzureIdentityBinding`:
