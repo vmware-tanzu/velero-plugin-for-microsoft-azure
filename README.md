@@ -318,11 +318,15 @@ velero install \
 
 Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
-(Optional) Specify [additional configurable parameters][7] for the `--backup-location-config` flag.
+### Optional installation steps
+1. Specify [additional configurable parameters][7] for the `--backup-location-config` flag.
+1. Specify [additional configurable parameters][8] for the `--snapshot-location-config` flag.
+1. [Customize the Velero installation][9] further to meet your needs.
+1. Velero does not officially [support for Windows containers][10]. If your cluster has both Windows and Linux agent pool, add a node selector to the `velero` deployment to run Velero only on the Linux nodes. This can be done using the below command.
+    ```bash
+    kubectl patch deploy velero --namespace velero --type merge --patch '{ \"spec\": { \"template\": { \"spec\": { \"nodeSelector\": { \"beta.kubernetes.io/os\": \"linux\"} } } } }'
+    ```
 
-(Optional) Specify [additional configurable parameters][8] for the `--snapshot-location-config` flag.
-
-(Optional) [Customize the Velero installation][9] further to meet your needs.
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
@@ -334,6 +338,7 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [7]: backupstoragelocation.md
 [8]: volumesnapshotlocation.md
 [9]: https://velero.io/docs/customize-installation/
+[10]:https://velero.io/docs/v1.4/basic-install/#velero-on-windows
 [11]: https://velero.io/docs/faq/
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
