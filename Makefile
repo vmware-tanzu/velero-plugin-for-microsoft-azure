@@ -73,6 +73,9 @@ verify-modules: modules
 	fi
 
 
+changelog:
+	hack/release-tools/changelog.sh
+
 # clean removes build artifacts from the local environment.
 clean:
 	@echo "cleaning"
