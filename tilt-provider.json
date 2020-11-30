@@ -1,0 +1,11 @@
+{
+  "name": "azure",
+  "config": {
+    "context": ".",
+    "image": "velero/velero-plugin-for-microsoft-azure",
+    "live_reload_deps": [
+      "velero-plugin-for-microsoft-azure"
+    ],
+    "go_main": "./velero-plugin-for-microsoft-azure"
+  }
+}
