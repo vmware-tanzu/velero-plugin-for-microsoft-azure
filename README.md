@@ -150,12 +150,12 @@ The following are the minimum required permissions needed by Velero to perform b
 
 To backup to the Storage Account, Velero uses the Storage Account Key which it retrieves via the Azure API if not provided. The [Storage Account Key Operator Service Role](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-key-operator-service-role) can be assigned to the [service principal][17] or the [AAD Pod Identity][20] to allow this.
 
-#### Snapshot and Disk Management
+##### Snapshot and Disk Management
 
 There aren't any predefined Roles in Azure that define the minimum required permissions for Velero to manage disks and snapshots.
 [Custom Roles](https://docs.microsoft.com/en-us/azure/role-based-access-control/custom-roles) can be defined using the following Azure API permissions.
 
-#### Velero Disk Management
+##### Velero Disk Management
 
 These permissions are required on the Resource Group where the disks are be located, which may be different from where the snapshots are located.
 
