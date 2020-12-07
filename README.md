@@ -150,7 +150,6 @@ The following are the minimum required permissions needed by Velero to perform b
 
 There are two *Azure Roles* that provide the necessary permissions for the [service principal][17] or the [AAD Pod Identity][20]:
 
-* [Storage Blob Data Contributor](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-blob-data-contributor)
 * [Storage Account Key Operator Service Role](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-key-operator-service-role)
 
 #### Snapshot and Disk Management
