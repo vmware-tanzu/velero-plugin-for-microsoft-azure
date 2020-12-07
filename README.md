@@ -148,9 +148,7 @@ The following are the minimum required permissions needed by Velero to perform b
 
 #### Storage Account
 
-There are two *Azure Roles* that provide the necessary permissions for the [service principal][17] or the [AAD Pod Identity][20]:
-
-* [Storage Account Key Operator Service Role](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-key-operator-service-role)
+To backup to the Storage Account, Velero uses the Storage Account Key which it retrieves via the Azure API if not provided. The [Storage Account Key Operator Service Role](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-key-operator-service-role) can be assigned to the [service principal][17] or the [AAD Pod Identity][20] to allow this.
 
 #### Snapshot and Disk Management
 
