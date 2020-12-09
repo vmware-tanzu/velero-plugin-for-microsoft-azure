@@ -22,6 +22,12 @@ Below is a listing of plugin versions and respective Velero versions that are co
 | v1.0.x          | v1.3.x         |
 | v1.0.x          | v1.2.0         |
 
+
+## Filing issues
+
+If you would like to file a GitHub issue for the plugin, please open the issue on the [core Velero repo][103]
+
+
 ## Kubernetes cluster prerequisites
 
 Ensure that the VMs for your agent pool allow Managed Disks. If I/O performance is critical,
@@ -349,3 +355,4 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"
+[103]: https://github.com/vmware-tanzu/velero/issues/new/choose 
