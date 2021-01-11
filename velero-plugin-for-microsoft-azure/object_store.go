@@ -390,13 +390,23 @@ func (o *ObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]st
 		Delimiter: delimiter,
 	}
 
-	res, err := container.ListBlobs(params)
-	if err != nil {
-		return nil, errors.WithStack(err)
+	var prefixes []string
+	for {
+		res, err := container.ListBlobs(params)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		prefixes = append(prefixes, res.BlobPrefixes...)
+		if res.NextMarker == "" {
+			break
+		}
+		params.Marker = res.NextMarker
 	}
 
-	return res.BlobPrefixes, nil
+	return prefixes, nil
 }
+
+
 
 func (o *ObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	container, err := o.containerGetter.getContainer(bucket)
@@ -408,17 +418,22 @@ func (o *ObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
 		Prefix: prefix,
 	}
 
-	res, err := container.ListBlobs(params)
-	if err != nil {
-		return nil, errors.WithStack(err)
+	var objects []string
+	for {
+		res, err := container.ListBlobs(params)
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		for _, blob := range res.Blobs {
+			objects = append(objects, blob.Name)
+		}
+		if res.NextMarker == "" {
+			break
+		}
+		params.Marker = res.NextMarker
 	}
 
-	ret := make([]string, 0, len(res.Blobs))
-	for _, blob := range res.Blobs {
-		ret = append(ret, blob.Name)
-	}
-
-	return ret, nil
+	return objects, nil
 }
 
 func (o *ObjectStore) DeleteObject(bucket string, key string) error {
