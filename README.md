@@ -337,6 +337,10 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
+## Extra security measures
+
+To improve security within Azure, it's good practice [to disable public traffic to your Azure Storage Account][23]. If your AKS cluster is in the same Azure Region as your storage account, access to your Azure Storage Account should be easily enabled by a [Virtual Network endpoint][24] on your VNet.
+
 [1]: #Create-Azure-storage-account-and-blob-container
 [2]: #Set-permissions-for-Velero
 [3]: #Install-and-start-Velero
@@ -353,6 +357,8 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [20]: https://github.com/Azure/aad-pod-identity
 [21]: https://github.com/Azure/aad-pod-identity#demo
 [22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
+[23]: https://docs.microsoft.com/en-us/azure/storage/common/storage-network-security
+[24]: https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"
 [103]: https://github.com/vmware-tanzu/velero/issues/new/choose 
