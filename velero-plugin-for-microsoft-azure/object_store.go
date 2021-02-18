@@ -159,8 +159,8 @@ func getSubscriptionID(config map[string]string) string {
 }
 
 func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
-	// load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
-	if err := loadEnv(); err != nil {
+	// load environment vars from credentials file in environment or config
+	if err := loadEnvFromCredentialsFile(config); err != nil {
 		return "", nil, err
 	}
 

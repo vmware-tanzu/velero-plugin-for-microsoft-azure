@@ -30,19 +30,39 @@ const (
 	cloudNameEnvVar      = "AZURE_CLOUD_NAME"
 
 	resourceGroupConfigKey = "resourceGroup"
+	credentialsFileKey     = "credentialsFile"
 )
 
-func loadEnv() error {
-	envFile := os.Getenv("AZURE_CREDENTIALS_FILE")
-	if envFile == "" {
+func loadEnvFromCredentialsFile(config map[string]string) error {
+	// Prioritize the credentials file path in config, if it exists
+	credentialsFile, ok := config[credentialsFileKey]
+	if ok {
+		// Check that the provided credentialsFile exists on disk
+		if _, err := os.Stat(credentialsFile); err != nil {
+			if os.IsNotExist(err) {
+				return errors.Wrapf(err, "provided credentialsFile does not exist")
+			}
+			return errors.Wrapf(err, "could not get credentialsFile info")
+		}
+	} else {
+		// If a credentials file does not exist in the config, fall back to
+		// any credentials file specified in the environment.
+		credentialsFile = os.Getenv("AZURE_CREDENTIALS_FILE")
+	}
+
+	if credentialsFile == "" {
 		return nil
 	}
 
-	if err := godotenv.Overload(envFile); err != nil {
-		return errors.Wrapf(err, "error loading environment from AZURE_CREDENTIALS_FILE (%s)", envFile)
+	if err := godotenv.Overload(credentialsFile); err != nil {
+		return errors.Wrapf(err, "error loading environment from credentials file (%s)", credentialsFile)
 	}
 
 	return nil
+}
+
+func loadEnv() error {
+	return loadEnvFromCredentialsFile(map[string]string{})
 }
 
 // ParseAzureEnvironment returns an azure.Environment for the given cloud
