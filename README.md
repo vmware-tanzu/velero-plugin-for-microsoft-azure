@@ -147,6 +147,38 @@ If you plan to use Velero to take Azure snapshots of your persistent volume mana
 
 If you don't plan to take Azure disk snapshots, any method is valid.
 
+### Minimum Required permissions
+
+It is always best practice to assign the minimum required permissions necessary for an application to do its work. 
+The following are the minimum required permissions needed by Velero to perform backups, restores, and deletions.
+
+#### Storage Account
+
+To backup to the Storage Account, Velero uses the Storage Account Key which it retrieves via the Azure API if not provided. The [Storage Account Key Operator Service Role](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-key-operator-service-role) can be assigned to the [service principal][17] or the [AAD Pod Identity][20] to allow this.
+
+#### Snapshot and Disk Management
+
+There aren't any predefined Roles in Azure that define the minimum required permissions for Velero to manage disks and snapshots.
+[Custom Roles](https://docs.microsoft.com/en-us/azure/role-based-access-control/custom-roles) can be defined using the following Azure API permissions.
+
+##### Velero Disk Management
+
+These permissions are required on the Resource Group where the disks are be located, which may be different from where the snapshots are located.
+
+* Microsoft.Compute/disks/read
+* Microsoft.Compute/disks/write
+* Microsoft.Compute/disks/endGetAccess/action
+* Microsoft.Compute/disks/beginGetAccess/action
+
+##### Velero Snapshot Management
+
+These permissions are required on the Resource Group where the snapshots will be located, which may be different from where the disks are located.
+
+* Microsoft.Compute/snapshots/read
+* Microsoft.Compute/snapshots/write
+* Microsoft.Compute/snapshots/delete
+* Microsoft.Compute/disks/beginGetAccess/action
+* Microsoft.Compute/disks/endGetAccess/action
 
 ### Option 1: Create service principal
 
