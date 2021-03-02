@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,27 +29,35 @@ const (
 	subscriptionIDEnvVar = "AZURE_SUBSCRIPTION_ID"
 	cloudNameEnvVar      = "AZURE_CLOUD_NAME"
 
-	resourceGroupConfigKey = "resourceGroup"
-	credentialsFileKey     = "credentialsFile"
+	resourceGroupConfigKey   = "resourceGroup"
+	credentialsFileConfigKey = "credentialsFile"
 )
 
-func loadEnvFromCredentialsFile(config map[string]string) error {
-	// Prioritize the credentials file path in config, if it exists
-	credentialsFile, ok := config[credentialsFileKey]
-	if ok {
+// credentialsFileFromEnv retrieves the Azure credentials file from the environment.
+func credentialsFileFromEnv() string {
+	return os.Getenv("AZURE_CREDENTIALS_FILE")
+}
+
+// selectCredentialsFile selects the Azure credentials file to use, retrieving it
+// from the given config or falling back to retrieving it from the environment.
+func selectCredentialsFile(config map[string]string) (string, error) {
+	if credentialsFile, ok := config[credentialsFileConfigKey]; ok {
 		// Check that the provided credentialsFile exists on disk
 		if _, err := os.Stat(credentialsFile); err != nil {
 			if os.IsNotExist(err) {
-				return errors.Wrapf(err, "provided credentialsFile does not exist")
+				return "", errors.Wrapf(err, "provided credentialsFile does not exist")
 			}
-			return errors.Wrapf(err, "could not get credentialsFile info")
+			return "", errors.Wrapf(err, "could not get credentialsFile info")
 		}
-	} else {
-		// If a credentials file does not exist in the config, fall back to
-		// any credentials file specified in the environment.
-		credentialsFile = os.Getenv("AZURE_CREDENTIALS_FILE")
+		return credentialsFile, nil
 	}
 
+	return credentialsFileFromEnv(), nil
+}
+
+// loadCredentialsIntoEnv loads the variables in the given credentials
+// file into the current environment.
+func loadCredentialsIntoEnv(credentialsFile string) error {
 	if credentialsFile == "" {
 		return nil
 	}
@@ -59,10 +67,6 @@ func loadEnvFromCredentialsFile(config map[string]string) error {
 	}
 
 	return nil
-}
-
-func loadEnv() error {
-	return loadEnvFromCredentialsFile(map[string]string{})
 }
 
 // ParseAzureEnvironment returns an azure.Environment for the given cloud
