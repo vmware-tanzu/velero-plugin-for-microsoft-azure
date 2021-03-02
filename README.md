@@ -42,7 +42,10 @@ To set up Velero on Azure, you:
 - [Set permissions for Velero][2]
 - [Install and start Velero][3]
 
-If you do not have the `az` Azure CLI 2.0 installed locally, follow the [install guide][18] to set it up.
+
+You can also use this plugin to create an additional [Backup Storage Location][12].
+
+If you do not have the `az` Azure CLI 2.0 installed locally, follow the [install guide][21] to set it up.
 
 Run:
 
@@ -85,7 +88,7 @@ separate `Velero_Backups` Resource Group.
 
 The storage account needs to be created with a globally unique id since this is used for dns. In
 the sample script below, we're generating a random name using `uuidgen`, but you can come up with
-this name however you'd like, following the [Azure naming rules for storage accounts][19]. The
+this name however you'd like, following the [Azure naming rules for storage accounts][22]. The
 storage account is created with encryption at rest capabilities (Microsoft managed keys) and is
 configured to only allow access via https.
 
@@ -124,7 +127,7 @@ of your cluster's resources before continuing._
 
 1. Set the name of the Resource Group that contains your Kubernetes cluster's virtual machines/disks.
 
-    **WARNING**: If you're using [AKS][22], `AZURE_RESOURCE_GROUP` must be set to the name of the auto-generated resource group that is created
+    **WARNING**: If you're using [AKS][25], `AZURE_RESOURCE_GROUP` must be set to the name of the auto-generated resource group that is created
     when you provision your cluster in Azure, since this is the resource group that contains your cluster's virtual machines/disks.
 
     ```bash
@@ -141,7 +144,7 @@ of your cluster's resources before continuing._
 
 ## Set permissions for Velero
 
-There are several ways Velero can authenticate to Azure: (1) by using a Velero-specific [service principal][17]; (2) by using [AAD Pod Identity][20]; or (3) by using a storage account access key.
+There are several ways Velero can authenticate to Azure: (1) by using a Velero-specific [service principal][20]; (2) by using [AAD Pod Identity][23]; or (3) by using a storage account access key.
 
 If you plan to use Velero to take Azure snapshots of your persistent volume managed disks, you **must** use the service principal or AAD Pod Identity method.
 
@@ -198,9 +201,9 @@ If you don't plan to take Azure disk snapshots, any method is valid.
 
 ### Option 2: Use AAD Pod Identity
 
-These instructions have been adapted from the [aad-pod-identity documentation][21].
+These instructions have been adapted from the [aad-pod-identity documentation][24].
 
-Before proceeding, ensure that you have installed and configured [aad-pod-identity][20] for your cluster.
+Before proceeding, ensure that you have installed and configured [aad-pod-identity][23] for your cluster.
 
 #### Create identity
 
@@ -337,9 +340,68 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
+## Create an additional Backup Storage Location
+
+If you are using Velero v1.6.0 or later, you can create additional Azure [Backup Storage Locations][13] that use their own credentials.
+These can also be created alongside Backup Storage Locations that use other providers.
+
+### Limitations
+It is not possible to use different credentials for additional Backup Storage Locations if you are pod based authentication such as [AAD Pod Identity][13].
+
+### Prerequisites
+
+* Velero 1.6.0 or later
+* Azure plugin must be installed, either at install time, or by running `velero plugin install velero/velero-plugin-for-microsoft-azure:v1.2.0`
+
+### Configure the blob container and credentials
+
+To configure a new Backup Storage Location with its own credentials, it is necessary to follow the steps above to [create the storage account and blob container to use][1], and generate the credentials file to interact with that blob container.
+You can either [create a service principal][15] or [use a storage account access key][16] to create the credentials file.
+Once you have created the credentials file, create a [Kubernetes Secret][17] in the Velero namespace that contains these credentials:
+
+```bash
+kubectl create secret generic -n velero bsl-credentials --from-file=azure=</path/to/credentialsfile>
+```
+
+This will create a secret named `bsl-credentials` with a single key (`azure`) which contains the contents of your credentials file.
+The name and key of this secret will be given to Velero when creating the Backup Storage Location, so it knows which secret data to use.
+
+### Create Backup Storage Location
+
+Once the bucket and credentials have been configured, these can be used to create the new Backup Storage Location.
+
+If you are using a service principal, create the Backup Storage Location as follows:
+
+```bash
+velero backup-location create <bsl-name> \
+  --provider azure \
+  --bucket $BLOB_CONTAINER \
+  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+  --credential=bsl-credentials=azure
+```
+
+Otherwise, use the following command if you are using a storage account access key:
+
+```bash
+velero backup-location create <bsl-name> \
+  --provider azure \
+  --bucket $BLOB_CONTAINER \
+  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+  --credential=bsl-credentials=azure
+```
+
+The Backup Storage Location is ready to use when it has the phase `Available`.
+You can check this with the following command:
+
+```bash
+velero backup-location get
+```
+
+To use this new Backup Storage Location when performing a backup, use the flag `--storage-location <bsl-name>` when running `velero backup create`.
+
 ## Extra security measures
 
-To improve security within Azure, it's good practice [to disable public traffic to your Azure Storage Account][23]. If your AKS cluster is in the same Azure Region as your storage account, access to your Azure Storage Account should be easily enabled by a [Virtual Network endpoint][24] on your VNet.
+To improve security within Azure, it's good practice [to disable public traffic to your Azure Storage Account][26]. If your AKS cluster is in the same Azure Region as your storage account, access to your Azure Storage Account should be easily enabled by a [Virtual Network endpoint][27] on your VNet.
 
 [1]: #Create-Azure-storage-account-and-blob-container
 [2]: #Set-permissions-for-Velero
@@ -351,14 +413,20 @@ To improve security within Azure, it's good practice [to disable public traffic 
 [9]: https://velero.io/docs/customize-installation/
 [10]:https://velero.io/docs/v1.4/basic-install/#velero-on-windows
 [11]: https://velero.io/docs/faq/
-[17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
-[18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
-[19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
-[20]: https://github.com/Azure/aad-pod-identity
-[21]: https://github.com/Azure/aad-pod-identity#demo
-[22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
-[23]: https://docs.microsoft.com/en-us/azure/storage/common/storage-network-security
-[24]: https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview
+[12]: #create-an-additional-backup-storage-location
+[13]: https://velero.io/docs/latest/api-types/backupstoragelocation/
+[14]: #option-2-use-aad-pod-identity
+[15]: #option-1-create-service-principal
+[16]: #option-3-use-storage-account-access-key
+[17]: https://kubernetes.io/docs/concepts/configuration/secret/
+[20]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
+[21]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
+[22]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
+[23]: https://github.com/Azure/aad-pod-identity
+[24]: https://github.com/Azure/aad-pod-identity#demo
+[25]: https://azure.microsoft.com/en-us/services/kubernetes-service/
+[26]: https://docs.microsoft.com/en-us/azure/storage/common/storage-network-security
+[27]: https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"
 [103]: https://github.com/vmware-tanzu/velero/issues/new/choose 
