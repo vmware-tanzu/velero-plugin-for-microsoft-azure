@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019, 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -85,8 +85,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		return err
 	}
 
-	// load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
-	if err := loadEnv(); err != nil {
+	if err := loadCredentialsIntoEnv(credentialsFileFromEnv()); err != nil {
 		return err
 	}
 

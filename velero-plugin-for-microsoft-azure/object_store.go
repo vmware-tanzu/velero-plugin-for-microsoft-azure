@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019, 2020 the Velero contributors.
+Copyright the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -159,8 +159,12 @@ func getSubscriptionID(config map[string]string) string {
 }
 
 func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
-	// load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
-	if err := loadEnv(); err != nil {
+	credentialsFile, err := selectCredentialsFile(config)
+	if err != nil {
+		return "", nil, err
+	}
+
+	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
 		return "", nil, err
 	}
 
@@ -246,6 +250,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		subscriptionIDConfigKey,
 		blockSizeConfigKey,
 		storageAccountKeyEnvVarConfigKey,
+		credentialsFileConfigKey,
 	); err != nil {
 		return err
 	}
@@ -405,8 +410,6 @@ func (o *ObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]st
 
 	return prefixes, nil
 }
-
-
 
 func (o *ObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	container, err := o.containerGetter.getContainer(bucket)
