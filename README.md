@@ -338,7 +338,7 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:vv1.2.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.2.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
@@ -352,7 +352,7 @@ If you're using **AAD Pod Identity**, you now need to add the `aadpodidbinding=$
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:vv1.2.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.2.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
