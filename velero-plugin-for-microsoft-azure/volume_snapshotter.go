@@ -44,6 +44,7 @@ const (
 
 	apiTimeoutConfigKey       = "apiTimeout"
 	snapsIncrementalConfigKey = "incremental"
+	snapsSkuConfigKey = "sku"
 
 	snapshotsResource = "snapshots"
 	disksResource     = "disks"
@@ -58,6 +59,7 @@ type VolumeSnapshotter struct {
 	disksResourceGroup string
 	snapsResourceGroup string
 	snapsIncremental   *bool
+	snapsSku           *disk.SnapshotSku
 	apiTimeout         time.Duration
 }
 
@@ -81,6 +83,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		apiTimeoutConfigKey,
 		subscriptionIDConfigKey,
 		snapsIncrementalConfigKey,
+		snapsSkuConfigKey,
 	); err != nil {
 		return err
 	}
@@ -145,6 +148,25 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		snapshotsIncremental = nil
 	}
 
+	// if config["snapsSkuConfigKey"] is empty, default to nil; otherwise, convert it
+	var snapshotsSku *disk.SnapshotSku
+	if val := config[snapsSkuConfigKey]; val != "" {
+		var snapshotsSkuName disk.SnapshotStorageAccountTypes;
+		switch val {
+			case "Premium_LRS":  snapshotsSkuName = disk.SnapshotStorageAccountTypesPremiumLRS
+			case "Standard_LRS": snapshotsSkuName = disk.SnapshotStorageAccountTypesStandardLRS
+			case "Standard_ZRS": snapshotsSkuName = disk.SnapshotStorageAccountTypesStandardZRS
+			default:
+				return errors.New(fmt.Sprintf("Invalid value %s for config key %s (Premium_LRS, Standard_LRS or Standard_ZRS are supported)", val, snapsSkuConfigKey))
+			}
+
+		snapshotsSku = &disk.SnapshotSku{
+			Name: snapshotsSkuName,
+		}
+	} else {
+		snapshotsSku = nil
+	}
+
 	// set up clients
 	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
 	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionID)
@@ -172,6 +194,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	b.apiTimeout = apiTimeout
 
 	b.snapsIncremental = snapshotsIncremental
+	b.snapsSku = snapshotsSku
 
 	return nil
 }
@@ -261,6 +284,7 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 
 	snap := disk.Snapshot{
 		Name: &snapshotName,
+		Sku: b.snapsSku,
 		SnapshotProperties: &disk.SnapshotProperties{
 			CreationData: &disk.CreationData{
 				CreateOption:     disk.Copy,
