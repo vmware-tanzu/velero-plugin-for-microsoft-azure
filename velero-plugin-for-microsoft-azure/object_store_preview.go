@@ -18,12 +18,12 @@ type ObjectStorePreview struct {
 }
 
 func (o *ObjectStorePreview) Init(config map[string]string) error {
-	cred, err := azblob.NewSharedKeyCredential(config["username"], config["password"])
+	cred, err := azblob.NewSharedKeyCredential(config["accountName"], config["accountKey"])
 	if err != nil {
 		return err
 	}
 
-	u, err := url.Parse(config["bloburl"])
+	u, err := url.Parse(config["blobUrl"])
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 	pipeline := azblob.NewPipeline(cred, azblob.PipelineOptions{})
 	context := context.Background()
 	service := azblob.NewServiceURL(*u, pipeline)
-	container := service.NewContainerURL(config["containername"])
+	container := service.NewContainerURL(config["containerName"])
 
 	o.pipeline = &pipeline
 	o.context = &context

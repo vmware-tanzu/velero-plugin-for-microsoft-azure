@@ -3,9 +3,9 @@ module github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
 go 1.13
 
 require (
-	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
+	github.com/Azure/azure-pipeline-go v0.2.3
 	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
-	github.com/Azure/azure-storage-blob-go v0.13.0 // indirect
+	github.com/Azure/azure-storage-blob-go v0.13.0
 	github.com/Azure/go-autorest/autorest v0.9.6
 	github.com/Azure/go-autorest/autorest/azure/auth v0.4.2
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
