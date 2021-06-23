@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/url"
 	"time"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-blob-go/azblob"
+	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 type ObjectStorePreview struct {
@@ -18,12 +20,28 @@ type ObjectStorePreview struct {
 }
 
 func (o *ObjectStorePreview) Init(config map[string]string) error {
-	cred, err := azblob.NewSharedKeyCredential(config["accountName"], config["accountKey"])
+	if err := veleroplugin.ValidateObjectStoreConfigKeys(config,
+		resourceGroupConfigKey,
+		storageAccountConfigKey,
+		subscriptionIDConfigKey,
+		blockSizeConfigKey,
+		storageAccountKeyEnvVarConfigKey,
+		credentialsFileConfigKey,
+	); err != nil {
+		return err
+	}
+
+	storageAccountKey, _, err := getStorageAccountKey(config)
 	if err != nil {
 		return err
 	}
 
-	u, err := url.Parse(config["blobUrl"])
+	cred, err := azblob.NewSharedKeyCredential(storageAccountConfigKey, storageAccountKey)
+	if err != nil {
+		return err
+	}
+
+	u, _ := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net", storageAccountConfigKey))
 	if err != nil {
 		return err
 	}
