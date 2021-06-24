@@ -55,7 +55,7 @@ func loadMockConfigfile(path string) (map[string]string, error) {
 	return config, nil
 }
 
-func TestInit(t *testing.T) {
+func TestPreviewInit(t *testing.T) {
 	config, err := loadMockConfigfile(mockConfigPath)
 	if err != nil {
 		t.Error(err)
@@ -69,7 +69,7 @@ func TestInit(t *testing.T) {
 	}
 }
 
-func TestListObjects(t *testing.T) {
+func TestPreviewListObjects(t *testing.T) {
 	config, err := loadMockConfigfile(mockConfigPath)
 	if err != nil {
 		t.Error(err)
@@ -91,7 +91,7 @@ func TestListObjects(t *testing.T) {
 	}
 }
 
-func TestNewObjectExists(t *testing.T) {
+func TestPreviewObjectExists(t *testing.T) {
 	config, err := loadMockConfigfile(mockConfigPath)
 	if err != nil {
 		t.Error(err)
