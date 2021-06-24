@@ -20,7 +20,6 @@ const (
 
 type ObjectStorePreview struct {
 	pipeline *pipeline.Pipeline
-	context  *context.Context
 	service  *azblob.ServiceURL
 }
 
