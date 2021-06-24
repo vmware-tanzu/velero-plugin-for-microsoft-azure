@@ -12,6 +12,7 @@ const (
 )
 
 var containerName string
+var testBlob string
 
 // mock config file schema
 // {
@@ -20,7 +21,8 @@ var containerName string
 // 	"storageAccountKeyEnvVar": "",
 // 	"storageAccountKey": "",
 // 	"subscriptionId": "",
-// 	"containerName": ""
+// 	"containerName": "",
+// 	"testBlob": ""
 // }
 
 func loadMockConfigfile(path string) (map[string]string, error) {
@@ -44,14 +46,13 @@ func loadMockConfigfile(path string) (map[string]string, error) {
 	containerName = config["containerName"]
 	delete(config, "containerName")
 
+	testBlob = config["testBlob"]
+	delete(config, "testBlob")
+
 	os.Setenv(config["storageAccountKeyEnvVar"], config["storageAccountKey"])
 	delete(config, "storageAccountKey")
 
 	return config, nil
-}
-
-func clearEnvVars() {
-	os.Setenv("AZURE_STORAGE_ACCOUNT_KEY", "")
 }
 
 func TestInit(t *testing.T) {
@@ -59,7 +60,6 @@ func TestInit(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	t.Cleanup(clearEnvVars)
 
 	objectStore := ObjectStorePreview{}
 
@@ -74,7 +74,6 @@ func TestListObjects(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	t.Cleanup(clearEnvVars)
 
 	objectStore := ObjectStorePreview{}
 
@@ -89,5 +88,28 @@ func TestListObjects(t *testing.T) {
 	}
 	for _, o := range objects {
 		t.Log(o)
+	}
+}
+
+func TestNewObjectExists(t *testing.T) {
+	config, err := loadMockConfigfile(mockConfigPath)
+	if err != nil {
+		t.Error(err)
+	}
+
+	objectStore := ObjectStorePreview{}
+
+	err = objectStore.Init(config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	exists, err := objectStore.ObjectExists(containerName, testBlob)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !exists {
+		t.Fail()
 	}
 }

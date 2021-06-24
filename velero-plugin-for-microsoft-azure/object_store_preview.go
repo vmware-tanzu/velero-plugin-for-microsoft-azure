@@ -62,7 +62,22 @@ func (o *ObjectStorePreview) PutObject(bucket, key string, body io.Reader) error
 }
 
 func (o *ObjectStorePreview) ObjectExists(bucket, key string) (bool, error) {
-	return false, errors.New("Not Implemented")
+	ctx := context.Background()
+	container := o.service.NewContainerURL(bucket)
+	blob := container.NewBlobURL(key)
+	_, err := blob.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+
+	if err == nil {
+		return true, err
+	}
+
+	if storageErr, ok := err.(azblob.StorageError); ok {
+		if storageErr.Response().StatusCode == 404 {
+			return false, nil
+		}
+	}
+
+	return false, err
 }
 
 func (o *ObjectStorePreview) GetObject(bucket, key string) (io.ReadCloser, error) {
