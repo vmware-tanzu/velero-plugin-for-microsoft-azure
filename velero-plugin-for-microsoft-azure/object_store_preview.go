@@ -9,6 +9,7 @@ import (
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-blob-go/azblob"
+	"github.com/pkg/errors"
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
@@ -57,19 +58,19 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 }
 
 func (o *ObjectStorePreview) PutObject(bucket, key string, body io.Reader) error {
-	return nil
+	return errors.New("Not Implemented")
 }
 
 func (o *ObjectStorePreview) ObjectExists(bucket, key string) (bool, error) {
-	return false, nil
+	return false, errors.New("Not Implemented")
 }
 
 func (o *ObjectStorePreview) GetObject(bucket, key string) (io.ReadCloser, error) {
-	return &io.PipeReader{}, nil
+	return &io.PipeReader{}, errors.New("Not Implemented")
 }
 
 func (o *ObjectStorePreview) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
-	return make([]string, 0), nil
+	return make([]string, 0), errors.New("Not Implemented")
 }
 
 func (o *ObjectStorePreview) ListObjects(bucket, prefix string) ([]string, error) {
@@ -95,9 +96,9 @@ func (o *ObjectStorePreview) ListObjects(bucket, prefix string) ([]string, error
 }
 
 func (o *ObjectStorePreview) DeleteObject(bucket string, key string) error {
-	return nil
+	return errors.New("Not Implemented")
 }
 
 func (o *ObjectStorePreview) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	return "", nil
+	return "", errors.New("Not Implemented")
 }
