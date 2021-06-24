@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
@@ -89,7 +90,9 @@ func (o *ObjectStorePreview) ListObjects(bucket, prefix string) ([]string, error
 		marker = listBlob.NextMarker
 
 		for _, blobInfo := range listBlob.Segment.BlobItems {
-			objects = append(objects, blobInfo.Name)
+			if prefix == "" || strings.Index(blobInfo.Name, prefix) == 0 {
+				objects = append(objects, blobInfo.Name)
+			}
 		}
 	}
 	return objects, nil
