@@ -12,6 +12,10 @@ import (
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
+const (
+	blob_url_suffix = "https://%s.blob.core.windows.net"
+)
+
 type ObjectStorePreview struct {
 	pipeline  *pipeline.Pipeline
 	context   *context.Context
@@ -41,7 +45,7 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 		return err
 	}
 
-	u, _ := url.Parse(fmt.Sprintf("https://%s.blob.core.windows.net", storageAccountConfigKey))
+	u, _ := url.Parse(fmt.Sprintf(blob_url_suffix, storageAccountConfigKey))
 	if err != nil {
 		return err
 	}
