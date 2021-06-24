@@ -11,6 +11,18 @@ const (
 	mockConfigPath = "../mock_config_object_store_preview"
 )
 
+var containerName string
+
+// mock config file schema
+// {
+// 	"resourceGroup": "",
+// 	"storageAccount": "",
+// 	"storageAccountKeyEnvVar": "",
+// 	"storageAccountKey": "",
+// 	"subscriptionId": "",
+// 	"containerName": ""
+// }
+
 func loadMockConfigfile(path string) (map[string]string, error) {
 
 	buf, err := ioutil.ReadFile(path)
@@ -29,8 +41,10 @@ func loadMockConfigfile(path string) (map[string]string, error) {
 		config[k] = v.(string)
 	}
 
-	os.Setenv("AZURE_STORAGE_ACCOUNT_KEY", config["storageAccountKey"])
-	config["storageAccountKeyEnvVar"] = "AZURE_STORAGE_ACCOUNT_KEY"
+	containerName = config["containerName"]
+	delete(config, "containerName")
+
+	os.Setenv(config["storageAccountKeyEnvVar"], config["storageAccountKey"])
 	delete(config, "storageAccountKey")
 
 	return config, nil
@@ -69,7 +83,7 @@ func TestListObjects(t *testing.T) {
 		t.Error(err)
 	}
 
-	objects, err := objectStore.ListObjects("test", "")
+	objects, err := objectStore.ListObjects(containerName, "")
 	if err != nil {
 		t.Error(err)
 	}
