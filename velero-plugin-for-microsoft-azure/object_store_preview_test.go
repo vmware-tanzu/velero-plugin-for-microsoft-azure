@@ -11,21 +11,25 @@ const (
 	mockConfigPath = "../mock_config_object_store_preview"
 )
 
-var containerName string
-var testBlobName string
+var mockConfig map[string]string = make(map[string]string)
 
 // mock config file schema
 // {
 // 	"resourceGroup": "",
 // 	"storageAccount": "",
 // 	"storageAccountKeyEnvVar": "",
-// 	"storageAccountKey": "",
 // 	"subscriptionId": "",
 // 	"containerName": "",
-// 	"testBlobName": ""
+// 	"storageAccountKey": "",
+// 	"testBlobName": "",
 // }
 
 func loadMockConfigfile(path string) (map[string]string, error) {
+	var allowedKeys []string = []string{"resourceGroup",
+		"storageAccount",
+		"storageAccountKeyEnvVar",
+		"subscriptionId",
+	}
 
 	buf, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -43,15 +47,23 @@ func loadMockConfigfile(path string) (map[string]string, error) {
 		config[k] = v.(string)
 	}
 
-	containerName = config["containerName"]
-	delete(config, "containerName")
-
-	testBlobName = config["testBlobName"]
-	delete(config, "testBlobName")
+	for k, v := range config {
+		mockConfig[k] = v
+	}
 
 	os.Setenv(config["storageAccountKeyEnvVar"], config["storageAccountKey"])
-	delete(config, "storageAccountKey")
 
+	for key := range config {
+		for _, allowedKey := range allowedKeys {
+			if key == allowedKey {
+				goto SKIP
+			}
+		}
+		delete(config, key)
+	SKIP:
+	}
+
+	println(mockConfig)
 	return config, nil
 }
 
@@ -64,6 +76,31 @@ func TestPreviewInit(t *testing.T) {
 	objectStore := ObjectStorePreview{}
 
 	err = objectStore.Init(config)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestPreviewPutObject(t *testing.T) {
+	config, err := loadMockConfigfile(mockConfigPath)
+	if err != nil {
+		t.Error(err)
+	}
+
+	objectStore := ObjectStorePreview{}
+
+	err = objectStore.Init(config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	fd, err := os.Open(mockConfig["testFilePath"])
+	if err != nil {
+		t.Error(err)
+	}
+	defer fd.Close()
+
+	err = objectStore.PutObject(mockConfig["containerName"], mockConfig["testBlobName"], fd)
 	if err != nil {
 		t.Error(err)
 	}
@@ -82,12 +119,12 @@ func TestPreviewListObjects(t *testing.T) {
 		t.Error(err)
 	}
 
-	objects, err := objectStore.ListObjects(containerName, "")
+	objects, err := objectStore.ListObjects(mockConfig["containerName"], "")
 	if err != nil {
 		t.Error(err)
 	}
-	for _, o := range objects {
-		t.Log(o)
+	if len(objects) == 0 {
+		t.Error("No objects found")
 	}
 }
 
@@ -104,7 +141,7 @@ func TestPreviewObjectExists(t *testing.T) {
 		t.Error(err)
 	}
 
-	exists, err := objectStore.ObjectExists(containerName, testBlobName)
+	exists, err := objectStore.ObjectExists(mockConfig["containerName"], mockConfig["testBlobName"])
 	if err != nil {
 		t.Error(err)
 	}
@@ -112,7 +149,4 @@ func TestPreviewObjectExists(t *testing.T) {
 	if !exists {
 		t.Fail()
 	}
-}
-
-func TestPreviewPutObject(t *testing.T) {
 }
