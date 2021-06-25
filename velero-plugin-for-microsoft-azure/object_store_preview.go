@@ -91,7 +91,7 @@ func (o *ObjectStorePreview) GetObject(bucket, key string) (io.ReadCloser, error
 }
 
 func (o *ObjectStorePreview) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
-	return make([]string, 0), errors.New("Not Implemented")
+	return make([]string, 0), nil // This function is not implemented.
 }
 
 func (o *ObjectStorePreview) ListObjects(bucket, prefix string) ([]string, error) {
