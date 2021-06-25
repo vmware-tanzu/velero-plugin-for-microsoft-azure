@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -148,5 +149,51 @@ func TestPreviewObjectExists(t *testing.T) {
 
 	if !exists {
 		t.Fail()
+	}
+}
+
+func TestPreviewGetObject(t *testing.T) {
+	config, err := loadMockConfigfile(mockConfigPath)
+	if err != nil {
+		t.Error(err)
+	}
+
+	objectStore := ObjectStorePreview{}
+
+	err = objectStore.Init(config)
+	if err != nil {
+		t.Error(err)
+	}
+	rc, err := objectStore.GetObject(mockConfig["containerName"], mockConfig["testBlobName"])
+	if err != nil {
+		t.Error(err)
+	}
+
+	fd, err := os.OpenFile(mockConfig["testFilePath"]+"-output", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		t.Error(err)
+	}
+
+	bw, err := io.Copy(fd, rc)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Logf("bytes written: %d", bw)
+}
+func TestPreviewDeleteObject(t *testing.T) {
+	config, err := loadMockConfigfile(mockConfigPath)
+	if err != nil {
+		t.Error(err)
+	}
+
+	objectStore := ObjectStorePreview{}
+
+	err = objectStore.Init(config)
+	if err != nil {
+		t.Error(err)
+	}
+	err = objectStore.DeleteObject(mockConfig["containerName"], mockConfig["testBlobName"])
+	if err != nil {
+		t.Error(err)
 	}
 }

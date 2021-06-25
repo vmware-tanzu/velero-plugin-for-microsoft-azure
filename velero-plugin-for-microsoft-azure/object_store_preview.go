@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
@@ -21,6 +20,7 @@ const (
 type ObjectStorePreview struct {
 	pipeline *pipeline.Pipeline
 	service  *azblob.ServiceURL
+	cpk      *azblob.ClientProvidedKeyOptions
 }
 
 func (o *ObjectStorePreview) Init(config map[string]string) error {
@@ -32,6 +32,12 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 	); err != nil {
 		return err
 	}
+
+	// DEBUG
+	key := "MDEyMzQ1NjcwMTIzNDU2NzAxMjM0NTY3MDEyMzQ1Njc="
+	hash := "3QFFFpRA5+XANHqwwbT4yXDmrT/2JaLt/FKHjzhOdoE="
+	scope := ""
+	cpk := azblob.NewClientProvidedKeyOptions(&key, &hash, &scope)
 
 	storageAccountKey, _, err := getStorageAccountKey(config)
 	if err != nil {
@@ -53,6 +59,7 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 
 	o.pipeline = &pipeline
 	o.service = &service
+	o.cpk = &cpk
 
 	return nil
 }
@@ -60,8 +67,7 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 func (o *ObjectStorePreview) PutObject(bucket, key string, body io.Reader) error {
 	container := o.service.NewContainerURL(bucket)
 	blobURL := container.NewBlockBlobURL(key)
-	response, err := azblob.UploadStreamToBlockBlob(context.Background(), body, blobURL, azblob.UploadStreamToBlockBlobOptions{})
-	_ = response
+	_, err := azblob.UploadStreamToBlockBlob(context.Background(), body, blobURL, azblob.UploadStreamToBlockBlobOptions{ClientProvidedKeyOptions: *o.cpk})
 
 	if err != nil {
 		return err
@@ -73,7 +79,7 @@ func (o *ObjectStorePreview) ObjectExists(bucket, key string) (bool, error) {
 	ctx := context.Background()
 	container := o.service.NewContainerURL(bucket)
 	blob := container.NewBlobURL(key)
-	_, err := blob.GetProperties(ctx, azblob.BlobAccessConditions{}, azblob.ClientProvidedKeyOptions{})
+	_, err := blob.GetProperties(ctx, azblob.BlobAccessConditions{}, *o.cpk)
 
 	if err == nil {
 		return true, err
@@ -91,7 +97,7 @@ func (o *ObjectStorePreview) ObjectExists(bucket, key string) (bool, error) {
 func (o *ObjectStorePreview) GetObject(bucket, key string) (io.ReadCloser, error) {
 	container := o.service.NewContainerURL(bucket)
 	blobURL := container.NewBlockBlobURL(key)
-	response, err := blobURL.Download(context.TODO(), 0, azblob.CountToEnd, azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	response, err := blobURL.Download(context.TODO(), 0, azblob.CountToEnd, azblob.BlobAccessConditions{}, false, *o.cpk)
 	if err != nil {
 		return nil, err
 	}
@@ -105,13 +111,11 @@ func (o *ObjectStorePreview) ListCommonPrefixes(bucket, prefix, delimiter string
 
 func (o *ObjectStorePreview) ListObjects(bucket, prefix string) ([]string, error) {
 	var objects []string
-	ctx := context.Background()
-
 	container := o.service.NewContainerURL(bucket)
-
 	marker := azblob.Marker{}
+
 	for marker.NotDone() {
-		listBlob, err := container.ListBlobsFlatSegment(ctx, marker, azblob.ListBlobsSegmentOptions{})
+		listBlob, err := container.ListBlobsFlatSegment(context.Background(), marker, azblob.ListBlobsSegmentOptions{Prefix: prefix})
 
 		if err != nil {
 			return nil, err
@@ -119,9 +123,7 @@ func (o *ObjectStorePreview) ListObjects(bucket, prefix string) ([]string, error
 		marker = listBlob.NextMarker
 
 		for _, blobInfo := range listBlob.Segment.BlobItems {
-			if prefix == "" || strings.Index(blobInfo.Name, prefix) == 0 {
-				objects = append(objects, blobInfo.Name)
-			}
+			objects = append(objects, blobInfo.Name)
 		}
 	}
 	return objects, nil
