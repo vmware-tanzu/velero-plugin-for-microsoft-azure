@@ -12,7 +12,7 @@ const (
 )
 
 var containerName string
-var testBlob string
+var testBlobName string
 
 // mock config file schema
 // {
@@ -22,7 +22,7 @@ var testBlob string
 // 	"storageAccountKey": "",
 // 	"subscriptionId": "",
 // 	"containerName": "",
-// 	"testBlob": ""
+// 	"testBlobName": ""
 // }
 
 func loadMockConfigfile(path string) (map[string]string, error) {
@@ -46,8 +46,8 @@ func loadMockConfigfile(path string) (map[string]string, error) {
 	containerName = config["containerName"]
 	delete(config, "containerName")
 
-	testBlob = config["testBlob"]
-	delete(config, "testBlob")
+	testBlobName = config["testBlobName"]
+	delete(config, "testBlobName")
 
 	os.Setenv(config["storageAccountKeyEnvVar"], config["storageAccountKey"])
 	delete(config, "storageAccountKey")
@@ -104,7 +104,7 @@ func TestPreviewObjectExists(t *testing.T) {
 		t.Error(err)
 	}
 
-	exists, err := objectStore.ObjectExists(containerName, testBlob)
+	exists, err := objectStore.ObjectExists(containerName, testBlobName)
 	if err != nil {
 		t.Error(err)
 	}
@@ -112,4 +112,7 @@ func TestPreviewObjectExists(t *testing.T) {
 	if !exists {
 		t.Fail()
 	}
+}
+
+func TestPreviewPutObject(t *testing.T) {
 }
