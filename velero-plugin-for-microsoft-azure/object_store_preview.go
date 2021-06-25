@@ -58,7 +58,13 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 }
 
 func (o *ObjectStorePreview) PutObject(bucket, key string, body io.Reader) error {
-	return errors.New("Not Implemented")
+	container := o.service.NewContainerURL(bucket)
+	blobURL := container.NewBlockBlobURL(key)
+	_, err := azblob.UploadStreamToBlockBlob(context.Background(), body, blobURL, azblob.UploadStreamToBlockBlobOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (o *ObjectStorePreview) ObjectExists(bucket, key string) (bool, error) {
