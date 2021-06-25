@@ -60,7 +60,9 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 func (o *ObjectStorePreview) PutObject(bucket, key string, body io.Reader) error {
 	container := o.service.NewContainerURL(bucket)
 	blobURL := container.NewBlockBlobURL(key)
-	_, err := azblob.UploadStreamToBlockBlob(context.Background(), body, blobURL, azblob.UploadStreamToBlockBlobOptions{})
+	response, err := azblob.UploadStreamToBlockBlob(context.Background(), body, blobURL, azblob.UploadStreamToBlockBlobOptions{})
+	_ = response
+
 	if err != nil {
 		return err
 	}
@@ -87,7 +89,14 @@ func (o *ObjectStorePreview) ObjectExists(bucket, key string) (bool, error) {
 }
 
 func (o *ObjectStorePreview) GetObject(bucket, key string) (io.ReadCloser, error) {
-	return &io.PipeReader{}, errors.New("Not Implemented")
+	container := o.service.NewContainerURL(bucket)
+	blobURL := container.NewBlockBlobURL(key)
+	response, err := blobURL.Download(context.TODO(), 0, azblob.CountToEnd, azblob.BlobAccessConditions{}, false, azblob.ClientProvidedKeyOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Body(azblob.RetryReaderOptions{}), nil
 }
 
 func (o *ObjectStorePreview) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
