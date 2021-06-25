@@ -119,7 +119,13 @@ func (o *ObjectStorePreview) ListObjects(bucket, prefix string) ([]string, error
 }
 
 func (o *ObjectStorePreview) DeleteObject(bucket string, key string) error {
-	return errors.New("Not Implemented")
+	container := o.service.NewContainerURL(bucket)
+	blobURL := container.NewBlockBlobURL(key)
+	_, err := blobURL.Delete(context.Background(), azblob.DeleteSnapshotsOptionNone, azblob.BlobAccessConditions{})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (o *ObjectStorePreview) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
