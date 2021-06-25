@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"time"
 
@@ -18,9 +19,10 @@ const (
 )
 
 type ObjectStorePreview struct {
-	pipeline *pipeline.Pipeline
-	service  *azblob.ServiceURL
-	cpk      *azblob.ClientProvidedKeyOptions
+	credential *azblob.SharedKeyCredential
+	pipeline   *pipeline.Pipeline
+	service    *azblob.ServiceURL
+	cpk        *azblob.ClientProvidedKeyOptions
 }
 
 func (o *ObjectStorePreview) Init(config map[string]string) error {
@@ -57,6 +59,7 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 	pipeline := azblob.NewPipeline(cred, azblob.PipelineOptions{})
 	service := azblob.NewServiceURL(*u, pipeline)
 
+	o.credential = cred
 	o.pipeline = &pipeline
 	o.service = &service
 	o.cpk = &cpk
@@ -140,5 +143,19 @@ func (o *ObjectStorePreview) DeleteObject(bucket string, key string) error {
 }
 
 func (o *ObjectStorePreview) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	return "", errors.New("Not Implemented")
+	sasQueryParams, err := azblob.BlobSASSignatureValues{
+		Protocol:      azblob.SASProtocolHTTPS,
+		ExpiryTime:    time.Now().UTC().Add(ttl),
+		ContainerName: bucket,
+		BlobName:      key,
+		Permissions:   azblob.BlobSASPermissions{Add: false, Read: true, Write: false}.String()}.NewSASQueryParameters(o.credential)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	qp := sasQueryParams.Encode()
+	SasUri := fmt.Sprintf("https://%s.blob.core.windows.net/%s/%s?%s",
+		o.credential.AccountName(), bucket, key, qp)
+
+	return SasUri, errors.New("Not Implemented")
 }
