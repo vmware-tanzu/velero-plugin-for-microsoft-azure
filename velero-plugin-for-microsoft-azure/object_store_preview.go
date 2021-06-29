@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/Azure/azure-pipeline-go/pipeline"
@@ -27,6 +28,10 @@ type ObjectStorePreview struct {
 	cpk        *azblob.ClientProvidedKeyOptions
 }
 
+func newObjectStorePreview(logger logrus.FieldLogger) (interface{}, error) {
+	return &ObjectStorePreview{log: logger}, nil
+}
+
 func (o *ObjectStorePreview) Init(config map[string]string) error {
 	if err := veleroplugin.ValidateObjectStoreConfigKeys(config,
 		resourceGroupConfigKey,
@@ -37,9 +42,8 @@ func (o *ObjectStorePreview) Init(config map[string]string) error {
 		return err
 	}
 
-	// DEBUG
-	key := "MDEyMzQ1NjcwMTIzNDU2NzAxMjM0NTY3MDEyMzQ1Njc="
-	hash := "3QFFFpRA5+XANHqwwbT4yXDmrT/2JaLt/FKHjzhOdoE="
+	key := os.Getenv("AZURE_ENCRYPTION_KEY")
+	hash := os.Getenv("AZURE_ENCRYPTION_HASH")
 	scope := ""
 	cpk := azblob.NewClientProvidedKeyOptions(&key, &hash, &scope)
 
