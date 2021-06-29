@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/azure-pipeline-go/pipeline"
 	"github.com/Azure/azure-storage-blob-go/azblob"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
@@ -19,6 +20,7 @@ const (
 )
 
 type ObjectStorePreview struct {
+	log        logrus.FieldLogger
 	credential *azblob.SharedKeyCredential
 	pipeline   *pipeline.Pipeline
 	service    *azblob.ServiceURL
