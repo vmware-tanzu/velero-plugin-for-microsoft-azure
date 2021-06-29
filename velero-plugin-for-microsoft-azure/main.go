@@ -17,15 +17,27 @@ limitations under the License.
 package main
 
 import (
+	"os"
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 func main() {
+	var osh veleroplugin.HandlerInitializer
+	override := strings.ToLower(os.Getenv("AZURE_OBJECT_STORE_OVERRIDE"))
+
+	if override == "preview" {
+		osh = newAzureObjectStore
+	} else {
+		osh = newObjectStorePreview
+	}
+
 	veleroplugin.NewServer().
 		BindFlags(pflag.CommandLine).
-		RegisterObjectStore("velero.io/azure", newAzureObjectStore).
+		RegisterObjectStore("velero.io/azure", osh).
 		RegisterVolumeSnapshotter("velero.io/azure", newAzureVolumeSnapshotter).
 		Serve()
 }
