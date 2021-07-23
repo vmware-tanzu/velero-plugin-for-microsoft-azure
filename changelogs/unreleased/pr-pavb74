@@ -1,1 +1,1 @@
-- add support for sku on snapshots of Azure disks (#96, @pavb74)
+Add support for sku on snapshots of Azure disks
