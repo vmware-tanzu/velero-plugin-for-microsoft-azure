@@ -44,7 +44,7 @@ const (
 
 	apiTimeoutConfigKey       = "apiTimeout"
 	snapsIncrementalConfigKey = "incremental"
-	snapsSkuConfigKey = "sku"
+	snapsSkuConfigKey         = "sku"
 
 	snapshotsResource = "snapshots"
 	disksResource     = "disks"
