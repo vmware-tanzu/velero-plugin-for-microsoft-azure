@@ -150,22 +150,25 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 
 	// if config["snapsSkuConfigKey"] is empty, default to nil; otherwise, convert it
 	var snapshotsSku *disk.SnapshotSku
-	if val := config[snapsSkuConfigKey]; val != "" {
-		var snapshotsSkuName disk.SnapshotStorageAccountTypes;
-		switch val {
-			case "Premium_LRS":  snapshotsSkuName = disk.SnapshotStorageAccountTypesPremiumLRS
-			case "Standard_LRS": snapshotsSkuName = disk.SnapshotStorageAccountTypesStandardLRS
-			case "Standard_ZRS": snapshotsSkuName = disk.SnapshotStorageAccountTypesStandardZRS
-			default:
-				return errors.New(fmt.Sprintf("Invalid value %s for config key %s (Premium_LRS, Standard_LRS or Standard_ZRS are supported)", val, snapsSkuConfigKey))
-			}
+    if val := config[snapsSkuConfigKey]; val != "" {
+        var snapshotsSkuName disk.SnapshotStorageAccountTypes
+        var found bool
+        for _, name := range disk.PossibleSnapshotStorageAccountTypesValues() {
+            if val == string(name) {
+                found = true
+                snapshotsSkuName = name
+            }
+        }
+        if !found {
+            return fmt.Errorf("Invalid value %s for config key %s (%v are supported)", val, snapsSkuConfigKey, disk.PossibleSnapshotStorageAccountTypesValues())
+        }
 
-		snapshotsSku = &disk.SnapshotSku{
-			Name: snapshotsSkuName,
-		}
-	} else {
-		snapshotsSku = nil
-	}
+        snapshotsSku = &disk.SnapshotSku{
+            Name: snapshotsSkuName,
+        }
+    } else {
+        snapshotsSku = nil
+    }
 
 	// set up clients
 	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
