@@ -17,9 +17,10 @@ COPY . /go/src/velero-plugin-for-microsoft-azure
 WORKDIR /go/src/velero-plugin-for-microsoft-azure
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
 
+FROM busybox:1.33.1 AS busybox
 
-FROM ubuntu:bionic
-RUN mkdir /plugins
+FROM gcr.io/distroless/base-debian10:nonroot
 COPY --from=build /go/bin/velero-plugin-for-microsoft-azure /plugins/
-USER nobody:nogroup
-ENTRYPOINT ["/bin/bash", "-c", "cp /plugins/* /target/."]
+COPY --from=busybox /bin/cp /bin/cp
+USER nonroot:nonroot
+ENTRYPOINT ["cp", "/plugins/velero-plugin-for-microsoft-azure", "/target/."]
