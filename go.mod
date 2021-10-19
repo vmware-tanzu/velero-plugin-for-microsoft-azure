@@ -4,8 +4,8 @@ go 1.13
 
 require (
 	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.9.6
-	github.com/Azure/go-autorest/autorest/azure/auth v0.4.2
+	github.com/Azure/go-autorest/autorest v0.11.21
+	github.com/Azure/go-autorest/autorest/azure/auth v0.5.8
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/hashicorp/go-hclog v0.9.2 // indirect
 	github.com/hashicorp/go-plugin v1.0.1-0.20190610192547-a1bc61569a26 // indirect
@@ -21,4 +21,7 @@ require (
 	k8s.io/apimachinery v0.19.12
 )
 
-replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
+replace (
+	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
+	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20201216223049-8b5274cf687f
+)
