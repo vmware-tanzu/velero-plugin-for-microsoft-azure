@@ -19,6 +19,7 @@ package main
 import (
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
@@ -27,7 +28,9 @@ import (
 )
 
 func TestGetVolumeID(t *testing.T) {
-	b := &VolumeSnapshotter{}
+	b := &VolumeSnapshotter{
+		log: logrus.New(),
+	}
 
 	pv := &unstructured.Unstructured{
 		Object: map[string]interface{}{},
@@ -52,6 +55,26 @@ func TestGetVolumeID(t *testing.T) {
 	volumeID, err = b.GetVolumeID(pv)
 	assert.NoError(t, err)
 	assert.Equal(t, "foo", volumeID)
+
+	// CSI driver: unknown driver name
+	csi := map[string]interface{}{
+		"driver":       "unknown.csi.azure.com",
+		"volumeHandle": " /subscriptions/subscription-id/resourceGroups/resource-group-name/providers/Microsoft.Compute/disks/bar",
+	}
+	pv.Object["spec"].(map[string]interface{})["csi"] = csi
+	volumeID, err = b.GetVolumeID(pv)
+	assert.NoError(t, err)
+	assert.Equal(t, "foo", volumeID)
+
+	// CSI driver: pass
+	csi = map[string]interface{}{
+		"driver":       "disk.csi.azure.com",
+		"volumeHandle": " /subscriptions/subscription-id/resourceGroups/resource-group-name/providers/Microsoft.Compute/disks/bar",
+	}
+	pv.Object["spec"].(map[string]interface{})["csi"] = csi
+	volumeID, err = b.GetVolumeID(pv)
+	assert.NoError(t, err)
+	assert.Equal(t, "bar", volumeID)
 }
 
 func TestSetVolumeID(t *testing.T) {
@@ -92,6 +115,29 @@ func TestSetVolumeID(t *testing.T) {
 	require.NotNil(t, res.Spec.AzureDisk)
 	assert.Equal(t, "revised", res.Spec.AzureDisk.DiskName)
 	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/revised", res.Spec.AzureDisk.DataDiskURI)
+
+	// CSI driver: unknown driver name
+	csi := map[string]interface{}{
+		"driver":       "unknown.csi.azure.com",
+		"volumeHandle": " /subscriptions/subscription-id/resourceGroups/resource-group-name/providers/Microsoft.Compute/disks/foo",
+	}
+	pv.Object["spec"].(map[string]interface{})["csi"] = csi
+	_, err = b.SetVolumeID(pv, "updated")
+	require.Error(t, err)
+
+	// CSI driver: pass
+	csi = map[string]interface{}{
+		"driver":       "disk.csi.azure.com",
+		"volumeHandle": " /subscriptions/subscription-id/resourceGroups/resource-group-name/providers/Microsoft.Compute/disks/foo",
+	}
+	pv.Object["spec"].(map[string]interface{})["csi"] = csi
+	updatedPV, err = b.SetVolumeID(pv, "updated")
+	require.NoError(t, err)
+
+	res = new(v1.PersistentVolume)
+	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(updatedPV.UnstructuredContent(), res))
+	require.NotNil(t, res.Spec.CSI)
+	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/updated", res.Spec.CSI.VolumeHandle)
 }
 
 func TestParseFullSnapshotName(t *testing.T) {
