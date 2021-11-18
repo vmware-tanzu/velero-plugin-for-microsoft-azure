@@ -17,10 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
-	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 )
@@ -31,6 +32,9 @@ const (
 
 	resourceGroupConfigKey   = "resourceGroup"
 	credentialsFileConfigKey = "credentialsFile"
+	subscriptionIDConfigKey  = "subscriptionId"
+
+	Storage cloud.ServiceName = "BlobStorage"
 )
 
 // credentialsFileFromEnv retrieves the Azure credentials file from the environment.
@@ -69,15 +73,32 @@ func loadCredentialsIntoEnv(credentialsFile string) error {
 	return nil
 }
 
-// ParseAzureEnvironment returns an azure.Environment for the given cloud
-// name, or azure.PublicCloud if cloudName is empty.
-func parseAzureEnvironment(cloudName string) (*azure.Environment, error) {
-	if cloudName == "" {
-		return &azure.PublicCloud, nil
+// map cloud names from go-autorest to cloud config from azure-sdk
+// add the storage endpoint
+func cloudFromName(cloudName string) (cloud.Configuration, error) {
+	fmt.Println(cloudName)
+	switch strings.ToUpper(cloudName) {
+	case "AZURECHINACLOUD":
+		config := cloud.AzureChina
+		config.Services[Storage] = cloud.ServiceConfiguration{
+			Endpoint: "core.chinacloudapi.cn",
+		}
+		return config, nil
+	case "", "AZURECLOUD", "AZUREPUBLICCLOUD":
+		config := cloud.AzurePublic
+		config.Services[Storage] = cloud.ServiceConfiguration{
+			Endpoint: "core.windows.net",
+		}
+		return config, nil
+	case "AZUREUSGOVERNMENT", "AZUREUSGOVERNMENTCLOUD":
+		config := cloud.AzureGovernment
+		config.Services[Storage] = cloud.ServiceConfiguration{
+			Endpoint: "core.usgovcloudapi.net",
+		}
+		return config, nil
+	default:
+		return cloud.Configuration{}, fmt.Errorf("there is no cloud matching the name %q", cloudName)
 	}
-
-	env, err := azure.EnvironmentFromName(cloudName)
-	return &env, errors.WithStack(err)
 }
 
 func getRequiredValues(getValue func(string) string, keys ...string) (map[string]string, error) {
@@ -97,4 +118,10 @@ func getRequiredValues(getValue func(string) string, keys ...string) (map[string
 	}
 
 	return results, nil
+}
+
+func mapLookup(data map[string]string) func(string) string {
+	return func(key string) string {
+		return data[key]
+	}
 }

@@ -158,28 +158,34 @@ If you plan to use Velero to take Azure snapshots of your persistent volume mana
 
 If you don't plan to take Azure disk snapshots, any method is valid.
 
-### Specify Role
-_**Note**: This is only required for (1) by using a Velero-specific service principal and  (2) by using ADD Pod Identity._  
+### Specify Roles
+_**Note**: This is only required for (1) by using a Velero-specific service principal and (2) by using ADD Pod Identity._  
 
 1. Obtain your Azure Account Subscription ID:
    ```
    AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
    ```
 
-2. Specify the role  
-There are two ways to specify the role: use the built-in role or create a custom one.  
-   You can use the Azure built-in role `Contributor`:
-   ```
-   AZURE_ROLE=Contributor
-   ```
+2. Specify the roles
+
+   There are two ways to specify the role: use the built-in role or create a custom one.  
+   You can use the Azure built-in roles `Contributor` and `Storage Blob Data Contributor`:
+
    This will have subscription-wide access, so protect the credential generated with this role.
    
    It is always best practice to assign the minimum required permissions necessary for an application to do its work.  
    
    Here are the minimum required permissions needed by Velero to perform backups, restores, and deletions:
-   - Storage Account
-      - Microsoft.Storage/storageAccounts/listkeys/action 
-      - Microsoft.Storage/storageAccounts/regeneratekey/action  
+   - Storage Account when subscriptionId and resourceGroup isn't set (recommended), based on role "Storage Blob Data Contributor"
+      - Microsoft.Storage/storageAccounts/blobServices/containers/read
+      - Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action
+      - Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete
+      - Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read
+      - Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write
+      - Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action
+   - Storage Account when subscriptionId and resourceGroup is set (deprecated)
+      - Microsoft.Storage/storageAccounts/listkeys/action
+      - Microsoft.Storage/storageAccounts/regeneratekey/action
    - Disk Management
       - Microsoft.Compute/disks/read
       - Microsoft.Compute/disks/write
@@ -199,6 +205,12 @@ There are two ways to specify the role: use the built-in role or create a custom
       "Name": "'$AZURE_ROLE'",
       "Description": "Velero related permissions to perform backups, restores and deletions",
       "Actions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+          "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action",
           "Microsoft.Compute/disks/read",
           "Microsoft.Compute/disks/write",
           "Microsoft.Compute/disks/endGetAccess/action",
@@ -206,8 +218,6 @@ There are two ways to specify the role: use the built-in role or create a custom
           "Microsoft.Compute/snapshots/read",
           "Microsoft.Compute/snapshots/write",
           "Microsoft.Compute/snapshots/delete",
-          "Microsoft.Storage/storageAccounts/listkeys/action",
-          "Microsoft.Storage/storageAccounts/regeneratekey/action"
       ],
       "AssignableScopes": ["/subscriptions/'$AZURE_SUBSCRIPTION_ID'"]
       }'
@@ -235,7 +245,7 @@ There are two ways to specify the role: use the built-in role or create a custom
     in the `az` command using `--scopes`._
 
     ```bash
-    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role $AZURE_ROLE --query 'password' -o tsv \
+    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --query 'password' -o tsv \
       --scopes  /subscriptions/$AZURE_SUBSCRIPTION_ID[ /subscriptions/$AZURE_BACKUP_SUBSCRIPTION_ID]`
     ```
 
@@ -245,6 +255,16 @@ There are two ways to specify the role: use the built-in role or create a custom
 
     ```bash
     AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
+    ```
+
+2. Assign the service principal roles:
+
+    ```bash
+    # with custom role
+    az role assignment create --role $AZURE_ROLE --assignee "velero" --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
+    # with built-in roles
+    az role assignment create --role "Contributor" --assignee "velero" --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
+    az role assignment create --role "Storage Blob Data Contributor" --assignee "velero" --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
     ```
 
 3. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
@@ -260,7 +280,7 @@ There are two ways to specify the role: use the built-in role or create a custom
     EOF
     ```
 
-    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
 ### Option 2: Use AAD Pod Identity
 
@@ -286,10 +306,14 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
     
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique identity name per cluster rather than the default `velero`.
 
-2. Assign the identity a role:
+2. Assign the identity roles:
 
     ```bash
-    export IDENTITY_ASSIGNMENT_ID="$(az role assignment create --role $AZURE_ROLE --assignee $IDENTITY_CLIENT_ID --scope /subscriptions/$AZURE_SUBSCRIPTION_ID --query id -otsv)"
+    # with custom role
+    az role assignment create --role $AZURE_ROLE --assignee "velero" --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
+    # with predefined roles
+    az role assignment create --role "Contributor" --assignee "velero" --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
+    az role assignment create --role "Storage Blob Data Contributor" --assignee "velero" --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
     ```
 
 3. In the cluster, create an `AzureIdentity` and `AzureIdentityBinding`:
@@ -327,7 +351,7 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
     EOF
     ```
 
-    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
 
 ### Option 3: Use storage account access key
@@ -349,7 +373,7 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
     EOF
     ```
 
-    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
 ## Install and start Velero
 
@@ -365,7 +389,7 @@ velero install \
     --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --backup-location-config storageAccount=$AZURE_STORAGE_ACCOUNT_ID \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
@@ -379,7 +403,7 @@ velero install \
     --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --backup-location-config storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY \
     --use-volume-snapshots=false
 ```
 
@@ -433,7 +457,7 @@ If you are using a service principal, create the Backup Storage Location as foll
 velero backup-location create <bsl-name> \
   --provider azure \
   --bucket $BLOB_CONTAINER \
-  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+  --config storageAccount=$AZURE_STORAGE_ACCOUNT_ID \
   --credential=bsl-credentials=azure
 ```
 
@@ -443,7 +467,7 @@ Otherwise, use the following command if you are using a storage account access k
 velero backup-location create <bsl-name> \
   --provider azure \
   --bucket $BLOB_CONTAINER \
-  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+  --config storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY \
   --credential=bsl-credentials=azure
 ```
 

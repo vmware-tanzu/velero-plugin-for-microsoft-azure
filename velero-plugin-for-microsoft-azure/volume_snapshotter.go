@@ -26,9 +26,13 @@ import (
 	"strings"
 	"time"
 
-	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-12-01/compute"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	azruntime "github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
 	uuid "github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -50,12 +54,13 @@ const (
 	disksResource     = "disks"
 
 	diskCSIDriver = "disk.csi.azure.com"
+	pollingDelay  = 5 * time.Second
 )
 
 type VolumeSnapshotter struct {
 	log                logrus.FieldLogger
-	disks              *disk.DisksClient
-	snaps              *disk.SnapshotsClient
+	disks              *armcompute.DisksClient
+	snaps              *armcompute.SnapshotsClient
 	disksSubscription  string
 	snapsSubscription  string
 	disksResourceGroup string
@@ -115,9 +120,9 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		snapshotsSubscriptionID = val
 	}
 
-	// Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// exist, parseAzureEnvironment will return azure.PublicCloud.
-	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
+	// Get Azure cloudConfig from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// exist, cloudFromName will return AzurePublic.
+	cloudConfig, err := cloudFromName(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
@@ -133,14 +138,10 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		}
 	}
 
-	// get authorizer from environment in the following order:
-	// 1. client credentials (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
-	// 2. client certificate (AZURE_CERTIFICATE_PATH, AZURE_CERTIFICATE_PASSWORD)
-	// 3. username and password (AZURE_USERNAME, AZURE_PASSWORD)
-	// 4. MSI (managed service identity)
-	authorizer, err := auth.NewAuthorizerFromEnvironmentWithResource(env.ResourceManagerEndpoint)
+	clientOptions := policy.ClientOptions{Cloud: cloudConfig}
+	credential, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{ClientOptions: clientOptions})
 	if err != nil {
-		return errors.Wrap(err, "error getting authorizer from environment")
+		return errors.Wrap(err, "error getting credentials from environment")
 	}
 
 	// if config["snapsIncrementalConfigKey"] is empty, default to nil; otherwise, parse it
@@ -164,17 +165,17 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	}
 
 	// set up clients
-	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
-	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionID)
+	disksClient, err := armcompute.NewDisksClient(envVars[subscriptionIDEnvVar], credential, &arm.ClientOptions{ClientOptions: clientOptions})
+	if err != nil {
+		return errors.Wrap(err, "error creating disk client")
+	}
+	snapsClient, err := armcompute.NewSnapshotsClient(envVars[subscriptionIDEnvVar], credential, &arm.ClientOptions{ClientOptions: clientOptions})
+	if err != nil {
+		return errors.Wrap(err, "error creating snapshot client")
+	}
 
-	disksClient.PollingDelay = 5 * time.Second
-	snapsClient.PollingDelay = 5 * time.Second
-
-	disksClient.Authorizer = authorizer
-	snapsClient.Authorizer = authorizer
-
-	b.disks = &disksClient
-	b.snaps = &snapsClient
+	b.disks = disksClient
+	b.snaps = snapsClient
 	b.disksSubscription = envVars[subscriptionIDEnvVar]
 	b.snapsSubscription = snapshotsSubscriptionID
 	b.disksResourceGroup = envVars[resourceGroupEnvVar]
@@ -198,12 +199,13 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 
 func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
 	snapshotIdentifier, err := parseFullSnapshotName(snapshotID)
+	diskStorageAccountType := armcompute.DiskStorageAccountTypes(volumeType)
 	if err != nil {
 		return "", err
 	}
 
 	// Lookup snapshot info for its Location & Tags so we can apply them to the volume
-	snapshotInfo, err := b.snaps.Get(context.TODO(), snapshotIdentifier.resourceGroup, snapshotIdentifier.name)
+	snapshotInfo, err := b.snaps.Get(context.TODO(), snapshotIdentifier.resourceGroup, snapshotIdentifier.name, nil)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -214,61 +216,58 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 	}
 	diskName := "restore-" + uid.String()
 
-	disk := disk.Disk{
+	disk := armcompute.Disk{
 		Name:     &diskName,
 		Location: snapshotInfo.Location,
-		DiskProperties: &disk.DiskProperties{
-			CreationData: &disk.CreationData{
-				CreateOption:     disk.DiskCreateOptionCopy,
-				SourceResourceID: stringPtr(snapshotIdentifier.String()),
+		Properties: &armcompute.DiskProperties{
+			CreationData: &armcompute.CreationData{
+				CreateOption:     to.Ptr(armcompute.DiskCreateOptionCopy),
+				SourceResourceID: to.Ptr(snapshotIdentifier.String()),
 			},
 		},
-		Sku: &disk.DiskSku{
-			Name: disk.DiskStorageAccountTypes(volumeType),
+		SKU: &armcompute.DiskSKU{
+			Name: to.Ptr(diskStorageAccountType),
 		},
 		Tags: snapshotInfo.Tags,
 	}
 	// If not a volume type 'zone redundant storage' restore the disk in the correct zone
-	if volumeType != "Premium_ZRS" && volumeType != "StandardSSD_ZRS" {
+	if diskStorageAccountType != armcompute.DiskStorageAccountTypesPremiumZRS && diskStorageAccountType != armcompute.DiskStorageAccountTypesStandardSSDZRS {
 		regionParts := strings.Split(volumeAZ, "-")
 		if len(regionParts) >= 2 {
-			disk.Zones = &[]string{regionParts[len(regionParts)-1]}
+			disk.Zones = []*string{to.Ptr(regionParts[len(regionParts)-1])}
 		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	future, err := b.disks.CreateOrUpdate(ctx, b.disksResourceGroup, *disk.Name, disk)
+	pollerResp, err := b.disks.BeginCreateOrUpdate(ctx, b.disksResourceGroup, *disk.Name, disk, nil)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
-	if err = future.WaitForCompletionRef(ctx, b.disks.Client); err != nil {
+	_, err = pollerResp.PollUntilDone(ctx, &azruntime.PollUntilDoneOptions{Frequency: pollingDelay})
+	if err != nil {
 		return "", errors.WithStack(err)
 	}
-	if _, err = future.Result(*b.disks); err != nil {
-		return "", errors.WithStack(err)
-	}
-
 	return diskName, nil
 }
 
 func (b *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	res, err := b.disks.Get(context.TODO(), b.disksResourceGroup, volumeID)
+	res, err := b.disks.Get(context.TODO(), b.disksResourceGroup, volumeID, nil)
 	if err != nil {
 		return "", nil, errors.WithStack(err)
 	}
 
-	if res.Sku == nil {
+	if res.SKU == nil {
 		return "", nil, errors.New("disk has a nil SKU")
 	}
 
-	return string(res.Sku.Name), nil, nil
+	return string(*res.SKU.Name), nil, nil
 }
 
 func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// Lookup disk info for its Location
-	diskInfo, err := b.disks.Get(context.TODO(), b.disksResourceGroup, volumeID)
+	diskInfo, err := b.disks.Get(context.TODO(), b.disksResourceGroup, volumeID, nil)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -288,11 +287,11 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 		snapshotName = volumeID[0:80-len(suffix)] + suffix
 	}
 
-	snap := disk.Snapshot{
+	snap := armcompute.Snapshot{
 		Name: &snapshotName,
-		SnapshotProperties: &disk.SnapshotProperties{
-			CreationData: &disk.CreationData{
-				CreateOption:     disk.DiskCreateOptionCopy,
+		Properties: &armcompute.SnapshotProperties{
+			CreationData: &armcompute.CreationData{
+				CreateOption:     to.Ptr(armcompute.DiskCreateOptionCopy),
 				SourceResourceID: &fullDiskName,
 			},
 			Incremental: b.snapsIncremental,
@@ -304,17 +303,14 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	future, err := b.snaps.CreateOrUpdate(ctx, b.snapsResourceGroup, *snap.Name, snap)
+	pollerResp, err := b.snaps.BeginCreateOrUpdate(ctx, b.snapsResourceGroup, *snap.Name, snap, nil)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
-	if err = future.WaitForCompletionRef(ctx, b.snaps.Client); err != nil {
+	_, err = pollerResp.PollUntilDone(ctx, &azruntime.PollUntilDoneOptions{Frequency: pollingDelay})
+	if err != nil {
 		return "", errors.WithStack(err)
 	}
-	if _, err = future.Result(*b.snaps); err != nil {
-		return "", errors.WithStack(err)
-	}
-
 	return getComputeResourceName(b.snapsSubscription, b.snapsResourceGroup, snapshotsResource, snapshotName), nil
 }
 
@@ -326,10 +322,8 @@ func getSnapshotTags(veleroTags, snapsTags map[string]string, diskTags map[strin
 	snapshotTags := make(map[string]*string)
 
 	// copy tags from disk to snapshot
-	if diskTags != nil {
-		for k, v := range diskTags {
-			snapshotTags[k] = stringPtr(*v)
-		}
+	for k, v := range diskTags {
+		snapshotTags[k] = stringPtr(*v)
 	}
 
 	// merge Velero-assigned tags with the disk's tags (note that we want current
@@ -365,21 +359,17 @@ func (b *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	// we don't want to return an error if the snapshot doesn't exist, and
 	// the Delete(..) call does not return a clear error if that's the case,
 	// so first try to get it and return early if we get a 404.
-	_, err = b.snaps.Get(ctx, snapshotInfo.resourceGroup, snapshotInfo.name)
-	if azureErr, ok := err.(autorest.DetailedError); ok && azureErr.StatusCode == http.StatusNotFound {
+	_, err = b.snaps.Get(ctx, snapshotInfo.resourceGroup, snapshotInfo.name, nil)
+	if azureErr, ok := err.(*azcore.ResponseError); ok && azureErr.StatusCode == http.StatusNotFound {
 		b.log.WithField("snapshotID", snapshotID).Debug("Snapshot not found")
 		return nil
 	}
 
-	future, err := b.snaps.Delete(ctx, snapshotInfo.resourceGroup, snapshotInfo.name)
+	pollerResp, err := b.snaps.BeginDelete(ctx, snapshotInfo.resourceGroup, snapshotInfo.name, nil)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	if err = future.WaitForCompletionRef(ctx, b.snaps.Client); err != nil {
-		b.log.WithError(err).Errorf("Error waiting for completion ref")
-		return errors.WithStack(err)
-	}
-	_, err = future.Result(*b.snaps)
+	_, err = pollerResp.PollUntilDone(ctx, &azruntime.PollUntilDoneOptions{Frequency: pollingDelay})
 	if err != nil {
 		return errors.WithStack(err)
 	}
