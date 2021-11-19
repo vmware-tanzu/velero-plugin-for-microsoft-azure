@@ -47,6 +47,8 @@ const (
 
 	snapshotsResource = "snapshots"
 	disksResource     = "disks"
+
+	diskCSIDriver = "disk.csi.azure.com"
 )
 
 type VolumeSnapshotter struct {
@@ -358,8 +360,11 @@ func getComputeResourceName(subscription, resourceGroup, resource, name string) 
 	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/%s/%s", subscription, resourceGroup, resource, name)
 }
 
-var snapshotURIRegexp = regexp.MustCompile(
-	`^\/subscriptions\/(?P<subscription>.*)\/resourceGroups\/(?P<resourceGroup>.*)\/providers\/Microsoft.Compute\/snapshots\/(?P<snapshotName>.*)$`)
+var (
+	snapshotURIRegexp = regexp.MustCompile(
+		`^\/subscriptions\/(?P<subscription>.*)\/resourceGroups\/(?P<resourceGroup>.*)\/providers\/Microsoft.Compute\/snapshots\/(?P<snapshotName>.*)$`)
+	diskURIRegexp = regexp.MustCompile(`\/Microsoft.Compute\/disks\/.*$`)
+)
 
 // parseFullSnapshotName takes a fully-qualified snapshot name and returns
 // a snapshot identifier or an error if the snapshot name does not match the
@@ -396,6 +401,13 @@ func (b *VolumeSnapshotter) GetVolumeID(unstructuredPV runtime.Unstructured) (st
 		return "", errors.WithStack(err)
 	}
 
+	if pv.Spec.CSI != nil {
+		if pv.Spec.CSI.Driver == diskCSIDriver {
+			return strings.TrimPrefix(diskURIRegexp.FindString(pv.Spec.CSI.VolumeHandle), "/Microsoft.Compute/disks/"), nil
+		}
+		b.log.Infof("Unable to handle CSI driver: %s", pv.Spec.CSI.Driver)
+	}
+
 	if pv.Spec.AzureDisk == nil {
 		return "", nil
 	}
@@ -413,12 +425,19 @@ func (b *VolumeSnapshotter) SetVolumeID(unstructuredPV runtime.Unstructured, vol
 		return nil, errors.WithStack(err)
 	}
 
-	if pv.Spec.AzureDisk == nil {
-		return nil, errors.New("spec.azureDisk not found")
-	}
+	if pv.Spec.CSI != nil {
+		if pv.Spec.CSI.Driver == diskCSIDriver {
+			pv.Spec.CSI.VolumeHandle = getComputeResourceName(b.disksSubscription, b.disksResourceGroup, disksResource, volumeID)
+		} else {
+			return nil, fmt.Errorf("unable to handle CSI driver: %s", pv.Spec.CSI.Driver)
+		}
 
-	pv.Spec.AzureDisk.DiskName = volumeID
-	pv.Spec.AzureDisk.DataDiskURI = getComputeResourceName(b.disksSubscription, b.disksResourceGroup, disksResource, volumeID)
+	} else if pv.Spec.AzureDisk != nil {
+		pv.Spec.AzureDisk.DiskName = volumeID
+		pv.Spec.AzureDisk.DataDiskURI = getComputeResourceName(b.disksSubscription, b.disksResourceGroup, disksResource, volumeID)
+	} else {
+		return nil, errors.New("spec.csi and spec.azureDisk not found")
+	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pv)
 	if err != nil {
