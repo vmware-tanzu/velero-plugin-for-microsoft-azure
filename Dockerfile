@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.13-buster AS build
+FROM golang:1.17-buster AS build
 COPY . /go/src/velero-plugin-for-microsoft-azure
 WORKDIR /go/src/velero-plugin-for-microsoft-azure
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
