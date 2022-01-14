@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.17-buster AS build
+FROM golang:1.17.6-buster AS build
 COPY . /go/src/velero-plugin-for-microsoft-azure
 WORKDIR /go/src/velero-plugin-for-microsoft-azure
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
 
 FROM busybox:1.33.1 AS busybox
 
-FROM gcr.io/distroless/base-debian10:nonroot
+# The digest of tag "nonroot" at the time of v1.4.0
+FROM gcr.io/distroless/base-debian10@sha256:6dc8ca7c3bbdb1a00fd8f1229b1b8c88986a5818b830e3a42d4946982dbbf18b
 COPY --from=build /go/bin/velero-plugin-for-microsoft-azure /plugins/
 COPY --from=busybox /bin/cp /bin/cp
 USER nonroot:nonroot
