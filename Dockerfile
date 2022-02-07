@@ -17,7 +17,7 @@ COPY . /go/src/velero-plugin-for-microsoft-azure
 WORKDIR /go/src/velero-plugin-for-microsoft-azure
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
 
-FROM busybox:1.33.1 AS busybox
+FROM busybox:1.34.1 AS busybox
 
 # The digest of tag "nonroot" at the time of v1.4.0
 FROM gcr.io/distroless/base-debian10@sha256:6dc8ca7c3bbdb1a00fd8f1229b1b8c88986a5818b830e3a42d4946982dbbf18b
