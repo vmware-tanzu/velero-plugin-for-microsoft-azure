@@ -29,8 +29,8 @@ import (
 	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
+	uuid "github.com/gofrs/uuid"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -190,7 +190,11 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 		return "", errors.WithStack(err)
 	}
 
-	diskName := "restore-" + uuid.NewV4().String()
+	uid, err := uuid.NewV4()
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	diskName := "restore-" + uid.String()
 
 	disk := disk.Disk{
 		Name:     &diskName,
@@ -253,7 +257,11 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 	fullDiskName := getComputeResourceName(b.disksSubscription, b.disksResourceGroup, disksResource, volumeID)
 	// snapshot names must be <= 80 characters long
 	var snapshotName string
-	suffix := "-" + uuid.NewV4().String()
+	uid, err := uuid.NewV4()
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	suffix := "-" + uid.String()
 
 	if len(volumeID) <= (80 - len(suffix)) {
 		snapshotName = volumeID + suffix
