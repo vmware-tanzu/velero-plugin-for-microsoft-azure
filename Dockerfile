@@ -1,4 +1,4 @@
-# Copyright 2017, 2019 the Velero contributors.
+# Copyright the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.17-buster AS build
+FROM --platform=$BUILDPLATFORM golang:1.17-buster AS build
+
+ARG TARGETOS
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+ENV GOOS=${TARGETOS} \
+    GOARCH=${TARGETARCH} \
+    GOARM=${TARGETVARIANT}
+
 COPY . /go/src/velero-plugin-for-microsoft-azure
 WORKDIR /go/src/velero-plugin-for-microsoft-azure
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
+RUN export GOARM=$( echo "${GOARM}" | cut -c2-) && \
+    CGO_ENABLED=0 go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
 
 FROM busybox:1.34.1 AS busybox
 
