@@ -71,6 +71,9 @@ if [[ ! -z "$TAG" ]]; then
 else
     echo "We're on branch $BRANCH"
     VERSION="$BRANCH"
+    if [[ "$VERSION" == release-* ]]; then
+      VERSION=${VERSION}-dev
+    fi
 fi
 
 if [[ -z "$BUILDX_PLATFORMS" ]]; then
@@ -83,6 +86,7 @@ echo "BRANCH: $BRANCH"
 echo "TAG: $TAG"
 echo "TAG_LATEST: $TAG_LATEST"
 echo "BUILDX_PLATFORMS: $BUILDX_PLATFORMS"
+echo "VERSION: $VERSION"
 
 echo "Building and pushing container images."
 
