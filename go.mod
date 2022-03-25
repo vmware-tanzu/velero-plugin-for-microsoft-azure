@@ -3,7 +3,7 @@ module github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
 go 1.17
 
 require (
-	github.com/Azure/azure-sdk-for-go v60.0.0+incompatible
+	github.com/Azure/azure-sdk-for-go v62.1.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.11.22
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.9
 	github.com/gofrs/uuid v4.2.0+incompatible
