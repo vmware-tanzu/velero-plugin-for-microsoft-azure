@@ -154,51 +154,74 @@ If you plan to use Velero to take Azure snapshots of your persistent volume mana
 
 If you don't plan to take Azure disk snapshots, any method is valid.
 
-### Minimum Required permissions
+### Specify Role
+_**Note**: This is only required for (1) by using a Velero-specific service principal and  (2) by using ADD Pod Identity._  
 
-It is always best practice to assign the minimum required permissions necessary for an application to do its work. 
-The following are the minimum required permissions needed by Velero to perform backups, restores, and deletions.
+1. Obtain your Azure Account Subscription ID:
+   ```
+   AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
+   ```
 
-#### Storage Account
-
-To backup to the Storage Account, Velero uses the Storage Account Key which it retrieves via the Azure API if not provided. The [Storage Account Key Operator Service Role](https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles#storage-account-key-operator-service-role) can be assigned to the [service principal][17] or the [AAD Pod Identity][20] to allow this.
-
-#### Snapshot and Disk Management
-
-There aren't any predefined Roles in Azure that define the minimum required permissions for Velero to manage disks and snapshots.
-[Custom Roles](https://docs.microsoft.com/en-us/azure/role-based-access-control/custom-roles) can be defined using the following Azure API permissions.
-
-##### Velero Disk Management
-
-These permissions are required on the Resource Group where the disks are be located, which may be different from where the snapshots are located.
-
-* Microsoft.Compute/disks/read
-* Microsoft.Compute/disks/write
-* Microsoft.Compute/disks/endGetAccess/action
-* Microsoft.Compute/disks/beginGetAccess/action
-
-##### Velero Snapshot Management
-
-These permissions are required on the Resource Group where the snapshots will be located, which may be different from where the disks are located.
-
-* Microsoft.Compute/snapshots/read
-* Microsoft.Compute/snapshots/write
-* Microsoft.Compute/snapshots/delete
-* Microsoft.Compute/disks/beginGetAccess/action
-* Microsoft.Compute/disks/endGetAccess/action
+2. Specify the role  
+There are two ways to specify the role: use the built-in role or create a custom one.  
+   You can use the Azure built-in role `Contributor`:
+   ```
+   AZURE_ROLE=Contributor
+   ```
+   This will have subscription-wide access, so protect the credential generated with this role.
+   
+   It is always best practice to assign the minimum required permissions necessary for an application to do its work.  
+   
+   Here are the minimum required permissions needed by Velero to perform backups, restores, and deletions:
+   - Storage Account
+      - Microsoft.Storage/storageAccounts/listkeys/action 
+      - Microsoft.Storage/storageAccounts/regeneratekey/action  
+   - Disk Management
+      - Microsoft.Compute/disks/read
+      - Microsoft.Compute/disks/write
+      - Microsoft.Compute/disks/endGetAccess/action
+      - Microsoft.Compute/disks/beginGetAccess/action
+   - Snapshot Management
+      - Microsoft.Compute/snapshots/read
+      - Microsoft.Compute/snapshots/write
+      - Microsoft.Compute/snapshots/delete
+      - Microsoft.Compute/disks/beginGetAccess/action
+      - Microsoft.Compute/disks/endGetAccess/action
+   
+   Use the following commands to create a custom role which has the minimum required permissions:
+   ```
+   AZURE_ROLE=Velero
+   az role definition create --role-definition '{
+      "Name": "Velero",
+      "Description": "Velero related permissions to perform backups, restores and deletions",
+      "Actions": [
+          "Microsoft.Compute/disks/read",
+          "Microsoft.Compute/disks/write",
+          "Microsoft.Compute/disks/endGetAccess/action",
+          "Microsoft.Compute/disks/beginGetAccess/action",
+          "Microsoft.Compute/snapshots/read",
+          "Microsoft.Compute/snapshots/write",
+          "Microsoft.Compute/snapshots/delete",
+          "Microsoft.Storage/storageAccounts/listkeys/action",
+          "Microsoft.Storage/storageAccounts/regeneratekey/action"
+      ],
+      "AssignableScopes": ["/subscriptions/'$AZURE_SUBSCRIPTION_ID'"]
+      }'
+   ```
+   _(Optional) If you are using a different Subscription for backups and cluster resources, make sure to specify both subscriptions
+   inside `AssignableScopes`._
 
 ### Option 1: Create service principal
 
 #### Create service principal
 
-1. Obtain your Azure Account Subscription ID and Tenant ID:
+1. Obtain your Azure Account Tenant ID:
 
     ```bash
-    AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
     AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
     ```
 
-1. Create a service principal with `Contributor` role. This will have subscription-wide access, so protect this credential.
+2. Create a service principal.
 
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
@@ -208,7 +231,7 @@ These permissions are required on the Resource Group where the snapshots will be
     in the `az` command using `--scopes`._
 
     ```bash
-    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role "Contributor" --query 'password' -o tsv \
+    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role $AZURE_ROLE --query 'password' -o tsv \
       --scopes  /subscriptions/$AZURE_SUBSCRIPTION_ID[ /subscriptions/$AZURE_BACKUP_SUBSCRIPTION_ID]`
     ```
 
@@ -220,7 +243,7 @@ These permissions are required on the Resource Group where the snapshots will be
     AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
     ```
 
-1. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
+3. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
 
     ```bash
     cat << EOF  > ./credentials-velero
@@ -243,12 +266,6 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
 
 #### Create identity
 
-1. Obtain your Azure Account Subscription ID:
-
-    ```bash
-    AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
-    ```
-
 1. Create an identity for Velero:
 
     ```bash
@@ -265,13 +282,13 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
     
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique identity name per cluster rather than the default `velero`.
 
-1. Assign the identity a role:
+2. Assign the identity a role:
 
     ```bash
-    export IDENTITY_ASSIGNMENT_ID="$(az role assignment create --role Contributor --assignee $IDENTITY_CLIENT_ID --scope /subscriptions/$AZURE_SUBSCRIPTION_ID --query id -otsv)"
+    export IDENTITY_ASSIGNMENT_ID="$(az role assignment create --role $AZURE_ROLE --assignee $IDENTITY_CLIENT_ID --scope /subscriptions/$AZURE_SUBSCRIPTION_ID --query id -otsv)"
     ```
 
-1. In the cluster, create an `AzureIdentity` and `AzureIdentityBinding`:
+3. In the cluster, create an `AzureIdentity` and `AzureIdentityBinding`:
 
     ```bash
     cat <<EOF | kubectl apply -f -
@@ -296,7 +313,7 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
     EOF
     ```
 
-1. Create a file that contains all the relevant environment variables:
+4. Create a file that contains all the relevant environment variables:
 
     ```bash
     cat << EOF  > ./credentials-velero
