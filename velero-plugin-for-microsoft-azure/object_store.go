@@ -202,7 +202,7 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 	// 2. client certificate (AZURE_CERTIFICATE_PATH, AZURE_CERTIFICATE_PASSWORD)
 	// 3. username and password (AZURE_USERNAME, AZURE_PASSWORD)
 	// 4. MSI (managed service identity)
-	authorizer, err := auth.NewAuthorizerFromEnvironment()
+	authorizer, err := auth.NewAuthorizerFromEnvironmentWithResource(env.ResourceManagerEndpoint)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "error getting authorizer from environment")
 	}
