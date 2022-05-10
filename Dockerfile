@@ -32,4 +32,5 @@ FROM busybox:1.34.1 AS busybox
 FROM scratch
 COPY --from=build /go/bin/velero-plugin-for-microsoft-azure /plugins/
 COPY --from=busybox /bin/cp /bin/cp
+USER 65532:65532
 ENTRYPOINT ["cp", "/plugins/velero-plugin-for-microsoft-azure", "/target/."]
