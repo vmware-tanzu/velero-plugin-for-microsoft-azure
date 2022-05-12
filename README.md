@@ -192,7 +192,7 @@ There are two ways to specify the role: use the built-in role or create a custom
    ```
    AZURE_ROLE=Velero
    az role definition create --role-definition '{
-      "Name": "Velero",
+      "Name": "'$AZURE_ROLE'",
       "Description": "Velero related permissions to perform backups, restores and deletions",
       "Actions": [
           "Microsoft.Compute/disks/read",
