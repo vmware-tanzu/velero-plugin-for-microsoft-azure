@@ -32,11 +32,11 @@ import (
 	uuid "github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"sigs.k8s.io/azuredisk-csi-driver/pkg/util"
 )
 
 const (
@@ -44,6 +44,7 @@ const (
 
 	apiTimeoutConfigKey       = "apiTimeout"
 	snapsIncrementalConfigKey = "incremental"
+	snapsTagsConfigKey        = "tags"
 
 	snapshotsResource = "snapshots"
 	disksResource     = "disks"
@@ -61,6 +62,7 @@ type VolumeSnapshotter struct {
 	snapsResourceGroup string
 	snapsIncremental   *bool
 	apiTimeout         time.Duration
+	snapsTags          map[string]string
 }
 
 type snapshotIdentifier struct {
@@ -83,6 +85,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		apiTimeoutConfigKey,
 		subscriptionIDConfigKey,
 		snapsIncrementalConfigKey,
+		snapsTagsConfigKey,
 	); err != nil {
 		return err
 	}
@@ -147,6 +150,14 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		snapshotsIncremental = nil
 	}
 
+	var snapsTags map[string]string
+	if val := config[snapsTagsConfigKey]; val != "" {
+		snapsTags, err = util.ConvertTagsToMap(val)
+		if err != nil {
+			return errors.Wrapf(err, "unable to parse value %q for config key %q (the valid format is \"key1=value1,key2=value2\")", val, snapsTagsConfigKey)
+		}
+	}
+
 	// set up clients
 	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
 	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionID)
@@ -174,6 +185,8 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	b.apiTimeout = apiTimeout
 
 	b.snapsIncremental = snapshotsIncremental
+
+	b.snapsTags = snapsTags
 
 	return nil
 }
@@ -211,7 +224,7 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 		Tags: snapshotInfo.Tags,
 	}
 	// If not a volume type 'zone redundant storage' restore the disk in the correct zone
-	if (volumeType != "Premium_ZRS" && volumeType != "StandardSSD_ZRS") {
+	if volumeType != "Premium_ZRS" && volumeType != "StandardSSD_ZRS" {
 		regionParts := strings.Split(volumeAZ, "-")
 		if len(regionParts) >= 2 {
 			disk.Zones = &[]string{regionParts[len(regionParts)-1]}
@@ -279,7 +292,7 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 			},
 			Incremental: b.snapsIncremental,
 		},
-		Tags:     getSnapshotTags(tags, diskInfo.Tags),
+		Tags:     getSnapshotTags(tags, b.snapsTags, diskInfo.Tags),
 		Location: diskInfo.Location,
 	}
 
@@ -300,8 +313,8 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 	return getComputeResourceName(b.snapsSubscription, b.snapsResourceGroup, snapshotsResource, snapshotName), nil
 }
 
-func getSnapshotTags(veleroTags map[string]string, diskTags map[string]*string) map[string]*string {
-	if diskTags == nil && len(veleroTags) == 0 {
+func getSnapshotTags(veleroTags, snapsTags map[string]string, diskTags map[string]*string) map[string]*string {
+	if diskTags == nil && len(veleroTags) == 0 && len(snapsTags) == 0 {
 		return nil
 	}
 
@@ -322,6 +335,10 @@ func getSnapshotTags(veleroTags map[string]string, diskTags map[string]*string) 
 		// with dash (inline with what Kubernetes does)
 		key := strings.Replace(k, "/", "-", -1)
 		snapshotTags[key] = stringPtr(v)
+	}
+
+	for k, v := range snapsTags {
+		snapshotTags[k] = stringPtr(v)
 	}
 
 	return snapshotTags
