@@ -117,7 +117,7 @@ build-dirs:
 
 .PHONY: modules
 modules:
-	go mod tidy
+	go mod tidy -compat=1.17
 
 .PHONY: verify-modules
 verify-modules: modules

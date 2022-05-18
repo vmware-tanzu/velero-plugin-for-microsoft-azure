@@ -38,4 +38,9 @@ spec:
     #
     # Optional.
     incremental: "<false|true>"
+
+    # The tags added to the volume snapshots during the backup
+    #
+    # Optional.
+    tags: key1=value1,key2=value2
 ```

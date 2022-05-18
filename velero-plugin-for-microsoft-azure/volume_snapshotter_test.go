@@ -166,6 +166,7 @@ func TestGetSnapshotTags(t *testing.T) {
 	tests := []struct {
 		name       string
 		veleroTags map[string]string
+		snapsTags  map[string]string
 		diskTags   map[string]*string
 		expected   map[string]*string
 	}{
@@ -236,11 +237,22 @@ func TestGetSnapshotTags(t *testing.T) {
 				"overlapping-key": stringPtr("velero-val"),
 			},
 		},
+		{
+			name:       "velero, snapshot and volume tags all get applied",
+			veleroTags: map[string]string{"velero-key": "velero-val"},
+			snapsTags:  map[string]string{"snap-key": "snap-val"},
+			diskTags:   map[string]*string{"azure-key": stringPtr("azure-val")},
+			expected: map[string]*string{
+				"velero-key": stringPtr("velero-val"),
+				"snap-key":   stringPtr("snap-val"),
+				"azure-key":  stringPtr("azure-val"),
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res := getSnapshotTags(test.veleroTags, test.diskTags)
+			res := getSnapshotTags(test.veleroTags, test.snapsTags, test.diskTags)
 
 			if test.expected == nil {
 				assert.Nil(t, res)
