@@ -48,4 +48,4 @@ fi
 go build \
     -o ${OUTPUT} \
     -installsuffix "static" \
-    ${PKG}/${BIN}
+    ./velero-plugin-for-microsoft-azure
