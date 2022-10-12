@@ -86,11 +86,16 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		subscriptionIDConfigKey,
 		snapsIncrementalConfigKey,
 		snapsTagsConfigKey,
+		credentialsFileConfigKey,
 	); err != nil {
 		return err
 	}
 
-	if err := loadCredentialsIntoEnv(credentialsFileFromEnv()); err != nil {
+	credentialsFile, err := selectCredentialsFile(config)
+	if err != nil {
+		return err
+	}
+	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
 		return err
 	}
 
