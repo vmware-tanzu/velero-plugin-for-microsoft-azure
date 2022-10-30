@@ -357,27 +357,31 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 
 **If using service principal or AAD Pod Identity:**
 
+_**Note**: Values in square brackets `[]` are optional._
+
 ```bash
 velero install \
     --provider azure \
     --plugins velero/velero-plugin-for-microsoft-azure:v1.5.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID \
-    --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID
+    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
 If you're using **AAD Pod Identity**, you now need to add the `aadpodidbinding=$IDENTITY_NAME` label to the Velero pod(s), preferably through the Deployment's pod template.  
 
 **If using storage account access key and no Azure snapshots:**
 
+_**Note**: Values in square brackets `[]` are optional._
+
 ```bash
 velero install \
     --provider azure \
     --plugins velero/velero-plugin-for-microsoft-azure:v1.5.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID \
+    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --use-volume-snapshots=false
 ```
 
@@ -425,13 +429,13 @@ The name and key of this secret will be given to Velero when creating the Backup
 
 Once the bucket and credentials have been configured, these can be used to create the new Backup Storage Location.
 
-If you are using a service principal, create the Backup Storage Location as follows:
+If you are using a service principal, create the Backup Storage Location as follows (_values in square brackets `[]` are optional_):
 
 ```bash
 velero backup-location create <bsl-name> \
   --provider azure \
   --bucket $BLOB_CONTAINER \
-  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID \
+  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
   --credential=bsl-credentials=azure
 ```
 
@@ -441,7 +445,7 @@ Otherwise, use the following command if you are using a storage account access k
 velero backup-location create <bsl-name> \
   --provider azure \
   --bucket $BLOB_CONTAINER \
-  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID \
+  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
   --credential=bsl-credentials=azure
 ```
 
@@ -484,4 +488,4 @@ To improve security within Azure, it's good practice [to disable public traffic 
 [27]: https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"
-[103]: https://github.com/vmware-tanzu/velero/issues/new/choose 
+[103]: https://github.com/vmware-tanzu/velero/issues/new/choose
