@@ -17,16 +17,17 @@ This repository contains these plugins to support running Velero on Microsoft Az
 
 Below is a listing of plugin versions and respective Velero versions that are compatible.
 
-| Plugin Version  | Velero Version |
-|-----------------|----------------|
-| v1.5.x          | v1.9.x         |
-| v1.4.x          | v1.8.x         |
-| v1.3.x          | v1.7.x         |
-| v1.2.x          | v1.6.x         |
-| v1.1.x          | v1.5.x         |
-| v1.1.x          | v1.4.x         |
-| v1.0.x          | v1.3.x         |
-| v1.0.x          | v1.2.0         |
+| Plugin Version | Velero Version |
+|----------------|----------------|
+| v1.6.x         | v1.10.x        |
+| v1.5.x         | v1.9.x         |
+| v1.4.x         | v1.8.x         |
+| v1.3.x         | v1.7.x         |
+| v1.2.x         | v1.6.x         |
+| v1.1.x         | v1.5.x         |
+| v1.1.x         | v1.4.x         |
+| v1.0.x         | v1.3.x         |
+| v1.0.x         | v1.2.0         |
 
 
 ## Filing issues
@@ -360,7 +361,7 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.5.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
@@ -374,7 +375,7 @@ If you're using **AAD Pod Identity**, you now need to add the `aadpodidbinding=$
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.5.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
