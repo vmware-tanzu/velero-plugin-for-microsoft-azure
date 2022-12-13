@@ -29,7 +29,7 @@ WORKDIR /go/src/velero-plugin-for-microsoft-azure
 RUN export GOARM=$( echo "${GOARM}" | cut -c2-) && \
     CGO_ENABLED=0 go build -v -o /go/bin/velero-plugin-for-microsoft-azure ./velero-plugin-for-microsoft-azure
 
-FROM busybox:1.34.1 AS busybox
+FROM busybox:1.34.1-uclibc AS busybox
 
 FROM scratch
 COPY --from=build /go/bin/velero-plugin-for-microsoft-azure /plugins/
