@@ -116,6 +116,7 @@ az storage account create \
     --sku Standard_GRS \
     --encryption-services blob \
     --https-only true \
+    --min-tls-version TLS1_2 \
     --kind BlobStorage \
     --access-tier Hot
 ```
