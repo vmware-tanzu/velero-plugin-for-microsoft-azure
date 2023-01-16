@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -25,10 +26,19 @@ import (
 	"strings"
 	"time"
 
-	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
-	"github.com/Azure/azure-sdk-for-go/storage"
-	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/bloberror"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
+	azcontainer "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/sas"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/service"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -38,7 +48,6 @@ import (
 const (
 	storageAccountConfigKey          = "storageAccount"
 	storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
-	subscriptionIDConfigKey          = "subscriptionId"
 	blockSizeConfigKey               = "blockSizeInBytes"
 
 	// blocks must be less than/equal to 100MB in size
@@ -47,207 +56,261 @@ const (
 )
 
 type containerGetter interface {
-	getContainer(bucket string) (container, error)
+	getContainer(bucket string) container
 }
 
 type azureContainerGetter struct {
-	blobService *storage.BlobStorageClient
+	serviceClient *service.Client
 }
 
-func (cg *azureContainerGetter) getContainer(bucket string) (container, error) {
-	container := cg.blobService.GetContainerReference(bucket)
-	if container == nil {
-		return nil, errors.Errorf("unable to get container reference for bucket %v", bucket)
-	}
+func (cg *azureContainerGetter) getContainer(bucket string) container {
+	containerClient := cg.serviceClient.NewContainerClient(bucket)
 
 	return &azureContainer{
-		container: container,
-	}, nil
+		containerClient: containerClient,
+	}
 }
 
 type container interface {
-	ListBlobs(params storage.ListBlobsParameters) (storage.BlobListResponse, error)
+	ListBlobs(params *azcontainer.ListBlobsFlatOptions) *runtime.Pager[azcontainer.ListBlobsFlatResponse]
+	ListBlobsHierarchy(delimiter string, listOptions *azcontainer.ListBlobsHierarchyOptions) *runtime.Pager[azcontainer.ListBlobsHierarchyResponse]
 }
 
 type azureContainer struct {
-	container *storage.Container
+	containerClient *azcontainer.Client
 }
 
-func (c *azureContainer) ListBlobs(params storage.ListBlobsParameters) (storage.BlobListResponse, error) {
-	return c.container.ListBlobs(params)
+func (c *azureContainer) ListBlobs(params *azcontainer.ListBlobsFlatOptions) *runtime.Pager[azcontainer.ListBlobsFlatResponse] {
+	return c.containerClient.NewListBlobsFlatPager(params)
+}
+
+func (c *azureContainer) ListBlobsHierarchy(delimiter string, listOptions *azcontainer.ListBlobsHierarchyOptions) *runtime.Pager[azcontainer.ListBlobsHierarchyResponse] {
+	return c.containerClient.NewListBlobsHierarchyPager(delimiter, listOptions)
 }
 
 type blobGetter interface {
-	getBlob(bucket, key string) (blob, error)
+	getBlob(bucket, key string) blob
 }
 
 type azureBlobGetter struct {
-	blobService *storage.BlobStorageClient
+	serviceClient *service.Client
 }
 
-func (bg *azureBlobGetter) getBlob(bucket, key string) (blob, error) {
-	container := bg.blobService.GetContainerReference(bucket)
-	if container == nil {
-		return nil, errors.Errorf("unable to get container reference for bucket %v", bucket)
-	}
-
-	blob := container.GetBlobReference(key)
-	if blob == nil {
-		return nil, errors.Errorf("unable to get blob reference for key %v", key)
-	}
-
+func (bg *azureBlobGetter) getBlob(bucket, key string) blob {
+	containerClient := bg.serviceClient.NewContainerClient(bucket)
+	blobClient := containerClient.NewBlockBlobClient(key)
 	return &azureBlob{
-		blob: blob,
-	}, nil
+		container:     bucket,
+		blob:          key,
+		blobClient:    blobClient,
+		serviceClient: bg.serviceClient,
+	}
 }
 
 type blob interface {
-	PutBlock(blockID string, chunk []byte, options *storage.PutBlockOptions) error
-	PutBlockList(blocks []storage.Block, options *storage.PutBlockListOptions) error
+	PutBlock(blockID string, chunk []byte, options *blockblob.StageBlockOptions) error
+	PutBlockList(blocks []string, options *blockblob.CommitBlockListOptions) error
 	Exists() (bool, error)
-	Get(options *storage.GetBlobOptions) (io.ReadCloser, error)
-	Delete(options *storage.DeleteBlobOptions) error
-	GetSASURI(options *storage.BlobSASOptions) (string, error)
+	Get(options *azblob.DownloadStreamOptions) (io.ReadCloser, error)
+	Delete(options *azblob.DeleteBlobOptions) error
+	GetSASURI(duration time.Duration, sharedKeyCredential *azblob.SharedKeyCredential) (string, error)
 }
 
 type azureBlob struct {
-	blob *storage.Blob
+	container     string
+	blob          string
+	blobClient    *blockblob.Client
+	serviceClient *service.Client
 }
 
-func (b *azureBlob) PutBlock(blockID string, chunk []byte, options *storage.PutBlockOptions) error {
-	return b.blob.PutBlock(blockID, chunk, options)
+type nopCloser struct {
+	io.ReadSeeker
 }
-func (b *azureBlob) PutBlockList(blocks []storage.Block, options *storage.PutBlockListOptions) error {
-	return b.blob.PutBlockList(blocks, options)
+
+func (n nopCloser) Close() error {
+	return nil
+}
+
+// NopCloser returns a ReadSeekCloser with a no-op close method wrapping the provided io.ReadSeeker.
+func NopCloser(rs io.ReadSeeker) io.ReadSeekCloser {
+	return nopCloser{rs}
+}
+
+func (b *azureBlob) PutBlock(blockID string, chunk []byte, options *blockblob.StageBlockOptions) error {
+	_, err := b.blobClient.StageBlock(context.TODO(), blockID, NopCloser(bytes.NewReader(chunk)), options)
+	return err
+}
+
+func (b *azureBlob) PutBlockList(blocks []string, options *blockblob.CommitBlockListOptions) error {
+	_, err := b.blobClient.CommitBlockList(context.TODO(), blocks, options)
+	return err
 }
 
 func (b *azureBlob) Exists() (bool, error) {
-	return b.blob.Exists()
+	_, err := b.blobClient.GetProperties(context.TODO(), nil)
+	if err == nil {
+		return true, nil
+	}
+	if bloberror.HasCode(err, bloberror.ContainerNotFound, bloberror.BlobNotFound) {
+		return false, nil
+	}
+	return false, err
 }
 
-func (b *azureBlob) Get(options *storage.GetBlobOptions) (io.ReadCloser, error) {
-	return b.blob.Get(options)
+func (b *azureBlob) Get(options *azblob.DownloadStreamOptions) (io.ReadCloser, error) {
+	res, err := b.blobClient.BlobClient().DownloadStream(context.TODO(), options)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return res.Body, nil
 }
 
-func (b *azureBlob) Delete(options *storage.DeleteBlobOptions) error {
-	return b.blob.Delete(options)
+func (b *azureBlob) Delete(options *azblob.DeleteBlobOptions) error {
+	_, err := b.blobClient.Delete(context.TODO(), options)
+	return err
 }
 
-func (b *azureBlob) GetSASURI(options *storage.BlobSASOptions) (string, error) {
-	return b.blob.GetSASURI(*options)
+// When the sharedKeyCredential is provided service SAS is used else delegation SAS is used
+func (b *azureBlob) GetSASURI(ttl time.Duration, sharedKeyCredential *azblob.SharedKeyCredential) (string, error) {
+	var queryParam sas.QueryParameters
+	var err error
+	// because of clock skew it can happen that the token is not yet valid, so make it valid in the past
+	startTime := time.Now().Add(-10 * time.Minute).UTC()
+	expiryTime := time.Now().Add(ttl).UTC()
+	blobSignatureValues := sas.BlobSignatureValues{
+		ContainerName: b.container,
+		BlobName:      b.blob,
+		Protocol:      sas.ProtocolHTTPS,
+		StartTime:     startTime,
+		ExpiryTime:    expiryTime,
+		Permissions:   to.Ptr(sas.BlobPermissions{Read: true}).String(),
+	}
+
+	if sharedKeyCredential == nil {
+		var udc *service.UserDelegationCredential
+		info := service.KeyInfo{
+			Start:  to.Ptr(startTime.Format(sas.TimeFormat)),
+			Expiry: to.Ptr(expiryTime.Format(sas.TimeFormat)),
+		}
+		udc, err = b.serviceClient.GetUserDelegationCredential(context.TODO(), info, nil)
+
+		if err != nil {
+			return "", err
+		}
+		queryParam, err = blobSignatureValues.SignWithUserDelegation(udc)
+	} else {
+		queryParam, err = blobSignatureValues.SignWithSharedKey(sharedKeyCredential)
+	}
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf("%s?%s", b.blobClient.URL(), queryParam.Encode())
+	return url, nil
 }
 
 type ObjectStore struct {
-	log             logrus.FieldLogger
-	containerGetter containerGetter
-	blobGetter      blobGetter
-	blockSize       int
+	log logrus.FieldLogger
+
+	containerGetter       containerGetter
+	blobGetter            blobGetter
+	blockSize             int
+	storageAccount        string
+	storageEndpointSuffix string
+	// we need to keep the credential here to create the sas url
+	sharedKeyCredential *azblob.SharedKeyCredential
 }
 
 func newObjectStore(logger logrus.FieldLogger) *ObjectStore {
 	return &ObjectStore{log: logger}
 }
 
-// getSubscriptionID gets the subscription ID from the 'config' map if it contains
-// it, else from the AZURE_SUBSCRIPTION_ID environment variable.
-func getSubscriptionID(config map[string]string) string {
-	if subscriptionID := config[subscriptionIDConfigKey]; subscriptionID != "" {
-		return subscriptionID
-	}
-
-	return os.Getenv(subscriptionIDEnvVar)
-}
-
-func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
+// get storage account key from env var whose name is in config[storageAccountKeyEnvVarConfigKey].
+func getStorageAccountKey(config map[string]string) (string, error) {
 	credentialsFile, err := selectCredentialsFile(config)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
-
 	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
-		return "", nil, err
+		return "", err
+	}
+	secretKeyEnvVar := config[storageAccountKeyEnvVarConfigKey]
+	if secretKeyEnvVar != "" {
+		return os.Getenv(secretKeyEnvVar), nil
 	}
 
-	// get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// exist, parseAzureEnvironment will return azure.PublicCloud.
-	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
-	if err != nil {
-		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
-	}
-
-	// get storage account key from env var whose name is in config[storageAccountKeyEnvVarConfigKey].
-	// If the config does not exist, continue obtaining the storage key using API
-	if secretKeyEnvVar := config[storageAccountKeyEnvVarConfigKey]; secretKeyEnvVar != "" {
-		storageKey := os.Getenv(secretKeyEnvVar)
-		if storageKey == "" {
-			return "", env, errors.Errorf("no storage account key found in env var %s", secretKeyEnvVar)
-		}
-
-		return storageKey, env, nil
-	}
-
-	// get subscription ID from object store config or AZURE_SUBSCRIPTION_ID environment variable
-	subscriptionID := getSubscriptionID(config)
-	if subscriptionID == "" {
-		return "", nil, errors.New("azure subscription ID not found in object store's config or in environment variable")
-	}
-
-	// we need config["resourceGroup"], config["storageAccount"]
-	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
-		return "", env, errors.Wrap(err, "unable to get all required config values")
-	}
-
-	// get authorizer from environment in the following order:
-	// 1. client credentials (AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET)
-	// 2. client certificate (AZURE_CERTIFICATE_PATH, AZURE_CERTIFICATE_PASSWORD)
-	// 3. username and password (AZURE_USERNAME, AZURE_PASSWORD)
-	// 4. MSI (managed service identity)
-	authorizer, err := auth.NewAuthorizerFromEnvironmentWithResource(env.ResourceManagerEndpoint)
-	if err != nil {
-		return "", nil, errors.Wrap(err, "error getting authorizer from environment")
-	}
-
-	// get storageAccountsClient
-	storageAccountsClient := storagemgmt.NewAccountsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
-	storageAccountsClient.Authorizer = authorizer
-
-	// get storage key
-	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey], storagemgmt.Kerb)
-	if err != nil {
-		return "", env, errors.WithStack(err)
-	}
-	if res.Keys == nil || len(*res.Keys) == 0 {
-		return "", env, errors.New("No storage keys found")
-	}
-
-	var storageKey string
-	for _, key := range *res.Keys {
-		// uppercase both strings for comparison because the ListKeys call returns e.g. "FULL" but
-		// the storagemgmt.Full constant in the SDK is defined as "Full".
-		if strings.ToUpper(string(key.Permissions)) == strings.ToUpper(string(storagemgmt.Full)) {
-			storageKey = *key.Value
-			break
-		}
-	}
-
-	if storageKey == "" {
-		return "", env, errors.New("No storage key with Full permissions found")
-	}
-
-	return storageKey, env, nil
+	return "", nil
 }
 
-func mapLookup(data map[string]string) func(string) string {
-	return func(key string) string {
-		return data[key]
+// getServiceClient creates a client via SharedKeyCredential or DefaultAzureCredential
+func getServiceClient(storageAccount, subscription, resouceGroup string, sharedKeyCredential *azblob.SharedKeyCredential, cloud cloud.Configuration) (*service.Client, *azblob.SharedKeyCredential, error) {
+	localSharedKeyCredential := sharedKeyCredential
+	serviceURL := getBlobServicUrl(storageAccount, cloud.Services[Storage].Endpoint)
+	clientOptions := policy.ClientOptions{Cloud: cloud}
+	var serviceClient *service.Client
+
+	if sharedKeyCredential == nil {
+		// doc: https://github.com/Azure/azure-sdk-for-go/tree/main/sdk/azidentity
+		credential, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{ClientOptions: policy.ClientOptions{Cloud: cloud}})
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "error getting credentials from environment")
+		}
+
+		// if subscription or resouceGroup isn't set use default credential to access the storage account
+		if subscription == "" || resouceGroup == "" {
+			serviceClient, err = service.NewClient(serviceURL, credential, &service.ClientOptions{ClientOptions: clientOptions})
+			return serviceClient, nil, err
+		}
+
+		// else fetch the storage account key
+		storageAccountKey, err := fetchStorageAccountKey(credential, clientOptions, subscription, resouceGroup, storageAccount)
+		if err != nil {
+			return nil, nil, err
+		}
+		localSharedKeyCredential, err = azblob.NewSharedKeyCredential(storageAccount, storageAccountKey)
+		if err != nil {
+			return nil, nil, err
+		}
+
 	}
+	serviceClient, err := service.NewClientWithSharedKeyCredential(serviceURL, localSharedKeyCredential, &service.ClientOptions{ClientOptions: clientOptions})
+	return serviceClient, localSharedKeyCredential, err
 }
 
+func getBlobServicUrl(storageAccount, storageEndpointSuffix string) string {
+	return fmt.Sprintf("https://%s.blob.%s", storageAccount, storageEndpointSuffix)
+}
+
+// fetch the storage account key using the default credential.
+// this is deprecated and will be removed in a future release.
+func fetchStorageAccountKey(credential *azidentity.DefaultAzureCredential, clientOptions policy.ClientOptions, subscription, resouceGroup, storageAccount string) (string, error) {
+	accountClient, err := armstorage.NewAccountsClient(subscription, credential, &arm.ClientOptions{ClientOptions: clientOptions})
+	if err != nil {
+		return "", err
+	}
+
+	res, err := accountClient.ListKeys(context.TODO(), resouceGroup, storageAccount, nil)
+	if err != nil {
+		return "", err
+	}
+
+	for _, key := range res.Keys {
+		// ignore case for comparison because the ListKeys call returns e.g. "FULL" but
+		// the armstorage.KeyPermissionFull constant in the SDK is defined as "Full".
+		if strings.EqualFold(string(*key.Permissions), string(armstorage.KeyPermissionFull)) {
+			return *key.Value, nil
+		}
+	}
+	return "", errors.New("No storage key with Full permissions found")
+}
+
+// Init sets up the ObjectStore using the shared key or default azure credentials
 func (o *ObjectStore) Init(config map[string]string) error {
+	var serviceClient *service.Client
 	if err := veleroplugin.ValidateObjectStoreConfigKeys(config,
-		resourceGroupConfigKey,
+		resourceGroupConfigKey, // deprecated
 		storageAccountConfigKey,
-		subscriptionIDConfigKey,
+		subscriptionIDConfigKey, // deprecated
 		blockSizeConfigKey,
 		storageAccountKeyEnvVarConfigKey,
 		credentialsFileConfigKey,
@@ -255,31 +318,48 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		return err
 	}
 
-	storageAccountKey, env, err := getStorageAccountKey(config)
+	if config[storageAccountConfigKey] == "" {
+		return errors.Errorf("%s not defined", storageAccountConfigKey)
+	}
+	o.storageAccount = config[storageAccountConfigKey]
+
+	// get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// exist, parseAzureEnvironment will return azure.PublicCloud.
+	cloudConfig, err := cloudFromName(os.Getenv(cloudNameEnvVar))
+	if err != nil {
+		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
+	}
+	o.storageEndpointSuffix = cloudConfig.Services[Storage].Endpoint
+
+	o.log.Debugf("Getting storage key")
+	// optional
+	storageAccountKey, err := getStorageAccountKey(config)
+	if err != nil {
+		o.log.Warnf("Couldn't load storage key: %s", err)
+	}
+	if storageAccountKey != "" {
+		o.sharedKeyCredential, err = azblob.NewSharedKeyCredential(o.storageAccount, storageAccountKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	o.log.Debugf("Creating service client")
+	serviceClient, o.sharedKeyCredential, err = getServiceClient(o.storageAccount, config[subscriptionIDConfigKey], config[resourceGroupConfigKey], o.sharedKeyCredential, cloudConfig)
 	if err != nil {
 		return err
 	}
 
-	// 6. get storageClient and blobClient
-	if _, err := getRequiredValues(mapLookup(config), storageAccountConfigKey); err != nil {
-		return errors.Wrap(err, "unable to get all required config values")
-	}
-
-	storageClient, err := storage.NewBasicClientOnSovereignCloud(config[storageAccountConfigKey], storageAccountKey, *env)
-	if err != nil {
-		return errors.Wrap(err, "error getting storage client")
-	}
-
-	blobClient := storageClient.GetBlobService()
 	o.containerGetter = &azureContainerGetter{
-		blobService: &blobClient,
+		serviceClient: serviceClient,
 	}
 	o.blobGetter = &azureBlobGetter{
-		blobService: &blobClient,
+		serviceClient: serviceClient,
 	}
 
+	o.log.Infof("Using storage account key: %t", o.sharedKeyCredential != nil)
+	o.log.Debugf("Getting blocksize")
 	o.blockSize = getBlockSize(o.log, config)
-
 	return nil
 }
 
@@ -305,19 +385,14 @@ func getBlockSize(log logrus.FieldLogger, config map[string]string) int {
 }
 
 func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
-	blob, err := o.blobGetter.getBlob(bucket, key)
-	if err != nil {
-		return err
-	}
-
+	blob := o.blobGetter.getBlob(bucket, key)
 	// Azure requires a blob/object to be chunked if it's larger than 256MB. Since we
 	// don't know ahead of time if the body is over this limit or not, and it would
 	// require reading the entire object into memory to determine the size, we use the
 	// chunking approach for all objects.
-
 	var (
 		block    = make([]byte, o.blockSize)
-		blockIDs []storage.Block
+		blockIDs []string
 	)
 
 	for {
@@ -332,10 +407,7 @@ func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 				return errors.Wrapf(putErr, "error putting block %s", blockID)
 			}
 
-			blockIDs = append(blockIDs, storage.Block{
-				ID:     blockID,
-				Status: storage.BlockStatusLatest,
-			})
+			blockIDs = append(blockIDs, blockID)
 		}
 
 		// got an io.EOF: we're done reading chunks from the body
@@ -357,11 +429,7 @@ func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 }
 
 func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
-	blob, err := o.blobGetter.getBlob(bucket, key)
-	if err != nil {
-		return false, err
-	}
-
+	blob := o.blobGetter.getBlob(bucket, key)
 	exists, err := blob.Exists()
 	if err != nil {
 		return false, errors.WithStack(err)
@@ -371,97 +439,60 @@ func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
 }
 
 func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
-	blob, err := o.blobGetter.getBlob(bucket, key)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := blob.Get(nil)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return res, nil
+	blob := o.blobGetter.getBlob(bucket, key)
+	return blob.Get(nil)
 }
 
 func (o *ObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
-	container, err := o.containerGetter.getContainer(bucket)
-	if err != nil {
-		return nil, err
-	}
-
-	params := storage.ListBlobsParameters{
-		Prefix:    prefix,
-		Delimiter: delimiter,
+	container := o.containerGetter.getContainer(bucket)
+	params := azcontainer.ListBlobsHierarchyOptions{
+		Prefix: &prefix,
 	}
 
 	var prefixes []string
-	for {
-		res, err := container.ListBlobs(params)
+	pager := container.ListBlobsHierarchy(delimiter, &params)
+	for pager.More() {
+		page, err := pager.NextPage(context.TODO())
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, err
 		}
-		prefixes = append(prefixes, res.BlobPrefixes...)
-		if res.NextMarker == "" {
-			break
+
+		for _, prefix := range page.ListBlobsHierarchySegmentResponse.Segment.BlobPrefixes {
+			prefixes = append(prefixes, *prefix.Name)
 		}
-		params.Marker = res.NextMarker
 	}
 
 	return prefixes, nil
 }
 
 func (o *ObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
-	container, err := o.containerGetter.getContainer(bucket)
-	if err != nil {
-		return nil, err
-	}
-
-	params := storage.ListBlobsParameters{
-		Prefix: prefix,
+	container := o.containerGetter.getContainer(bucket)
+	params := azcontainer.ListBlobsFlatOptions{
+		Prefix: &prefix,
 	}
 
 	var objects []string
-	for {
-		res, err := container.ListBlobs(params)
+	pager := container.ListBlobs(&params)
+	for pager.More() {
+		page, err := pager.NextPage(context.TODO())
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return nil, err
 		}
-		for _, blob := range res.Blobs {
-			objects = append(objects, blob.Name)
-		}
-		if res.NextMarker == "" {
-			break
-		}
-		params.Marker = res.NextMarker
-	}
 
+		for _, blob := range page.ListBlobsFlatSegmentResponse.Segment.BlobItems {
+			objects = append(objects, *blob.Name)
+		}
+	}
 	return objects, nil
 }
 
 func (o *ObjectStore) DeleteObject(bucket string, key string) error {
-	blob, err := o.blobGetter.getBlob(bucket, key)
-	if err != nil {
-		return err
-	}
-
-	return errors.WithStack(blob.Delete(nil))
+	blob := o.blobGetter.getBlob(bucket, key)
+	err := blob.Delete(nil)
+	return errors.WithStack(err)
 }
 
 func (o *ObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	blob, err := o.blobGetter.getBlob(bucket, key)
-	if err != nil {
-		return "", err
-	}
-
-	opts := storage.BlobSASOptions{
-		SASOptions: storage.SASOptions{
-			Expiry: time.Now().Add(ttl),
-		},
-		BlobServiceSASPermissions: storage.BlobServiceSASPermissions{
-			Read: true,
-		},
-	}
-
-	return blob.GetSASURI(&opts)
+	blob := o.blobGetter.getBlob(bucket, key)
+	return blob.GetSASURI(ttl, o.sharedKeyCredential)
 }

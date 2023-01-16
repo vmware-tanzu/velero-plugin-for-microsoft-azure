@@ -19,8 +19,12 @@ package main
 import (
 	"io"
 	"testing"
+	"time"
 
-	"github.com/Azure/azure-sdk-for-go/storage"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
+	azcontainer "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -78,7 +82,7 @@ func TestObjectExists(t *testing.T) {
 
 			blob := new(mockBlob)
 			defer blob.AssertExpectations(t)
-			blobGetter.On("getBlob", bucket, key).Return(blob, tc.getBlobError)
+			blobGetter.On("getBlob", bucket, key).Return(blob)
 
 			blob.On("Exists").Return(tc.exists, tc.errorResponse)
 
@@ -99,20 +103,20 @@ type mockBlobGetter struct {
 	mock.Mock
 }
 
-func (m *mockBlobGetter) getBlob(bucket string, key string) (blob, error) {
+func (m *mockBlobGetter) getBlob(bucket string, key string) blob {
 	args := m.Called(bucket, key)
-	return args.Get(0).(blob), args.Error(1)
+	return args.Get(0).(blob)
 }
 
 type mockBlob struct {
 	mock.Mock
 }
 
-func (m *mockBlob) PutBlock(blockID string, chunk []byte, options *storage.PutBlockOptions) error {
+func (m *mockBlob) PutBlock(blockID string, chunk []byte, options *blockblob.StageBlockOptions) error {
 	args := m.Called(blockID, chunk, options)
 	return args.Error(0)
 }
-func (m *mockBlob) PutBlockList(blocks []storage.Block, options *storage.PutBlockListOptions) error {
+func (m *mockBlob) PutBlockList(blocks []string, options *blockblob.CommitBlockListOptions) error {
 	args := m.Called(blocks, options)
 	return args.Error(0)
 }
@@ -122,18 +126,18 @@ func (m *mockBlob) Exists() (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
-func (m *mockBlob) Get(options *storage.GetBlobOptions) (io.ReadCloser, error) {
+func (m *mockBlob) Get(options *azblob.DownloadStreamOptions) (io.ReadCloser, error) {
 	args := m.Called(options)
 	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
-func (m *mockBlob) Delete(options *storage.DeleteBlobOptions) error {
+func (m *mockBlob) Delete(options *azblob.DeleteBlobOptions) error {
 	args := m.Called(options)
 	return args.Error(0)
 }
 
-func (m *mockBlob) GetSASURI(options *storage.BlobSASOptions) (string, error) {
-	args := m.Called(options)
+func (m *mockBlob) GetSASURI(ttl time.Duration, sharedKeyCredential *azblob.SharedKeyCredential) (string, error) {
+	args := m.Called(ttl, sharedKeyCredential)
 	return args.String(0), args.Error(1)
 }
 
@@ -150,7 +154,12 @@ type mockContainer struct {
 	mock.Mock
 }
 
-func (m *mockContainer) ListBlobs(params storage.ListBlobsParameters) (storage.BlobListResponse, error) {
+func (m *mockContainer) ListBlobs(params *azcontainer.ListBlobsFlatOptions) *runtime.Pager[azcontainer.ListBlobsFlatResponse] {
 	args := m.Called(params)
-	return args.Get(0).(storage.BlobListResponse), args.Error(1)
+	return args.Get(0).(*runtime.Pager[azcontainer.ListBlobsFlatResponse])
+}
+
+func (m *mockContainer) ListBlobsHierarchy(delimiter string, listOptions *azcontainer.ListBlobsHierarchyOptions) *runtime.Pager[azcontainer.ListBlobsHierarchyResponse] {
+	args := m.Called(delimiter, listOptions)
+	return args.Get(0).(*runtime.Pager[azcontainer.ListBlobsHierarchyResponse])
 }
