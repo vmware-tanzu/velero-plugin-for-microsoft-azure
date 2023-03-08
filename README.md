@@ -205,19 +205,21 @@ _**Note**: This is only required for (1) by using a Velero-specific service prin
       "Name": "'$AZURE_ROLE'",
       "Description": "Velero related permissions to perform backups, restores and deletions",
       "Actions": [
-          "Microsoft.Storage/storageAccounts/blobServices/containers/read",
-          "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action",
-          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
-          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
-          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
-          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action",
-          "Microsoft.Compute/disks/read",
-          "Microsoft.Compute/disks/write",
-          "Microsoft.Compute/disks/endGetAccess/action",
-          "Microsoft.Compute/disks/beginGetAccess/action",
-          "Microsoft.Compute/snapshots/read",
-          "Microsoft.Compute/snapshots/write",
-          "Microsoft.Compute/snapshots/delete",
+              "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+              "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action",
+              "Microsoft.Compute/disks/read",
+              "Microsoft.Compute/disks/write",
+              "Microsoft.Compute/disks/endGetAccess/action",
+              "Microsoft.Compute/disks/beginGetAccess/action",
+              "Microsoft.Compute/snapshots/read",
+              "Microsoft.Compute/snapshots/write",
+              "Microsoft.Compute/snapshots/delete"
+      ],
+      "dataActions": [
+              "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+              "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+              "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+              "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action"
       ],
       "AssignableScopes": ["/subscriptions/'$AZURE_SUBSCRIPTION_ID'"]
       }'
