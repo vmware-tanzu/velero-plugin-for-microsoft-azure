@@ -29,11 +29,9 @@ Below is a listing of plugin versions and respective Velero versions that are co
 | v1.0.x         | v1.3.x         |
 | v1.0.x         | v1.2.0         |
 
-
 ## Filing issues
 
 If you would like to file a GitHub issue for the plugin, please open the issue on the [core Velero repo][103]
-
 
 ## Kubernetes cluster prerequisites
 
@@ -48,7 +46,6 @@ To set up Velero on Azure, you:
 - [Get the resource group containing your VMs and disks][4]
 - [Set permissions for Velero][2]
 - [Install and start Velero][3]
-
 
 You can also use this plugin to create an additional [Backup Storage Location][12].
 
@@ -158,28 +155,32 @@ If you plan to use Velero to take Azure snapshots of your persistent volume mana
 
 If you don't plan to take Azure disk snapshots, any method is valid.
 
-### Specify Role
-_**Note**: This is only required for (1) by using a Velero-specific service principal and  (2) by using ADD Pod Identity._  
+### Specify Roles
+
+_**Note**: This is only required for (1) by using a Velero-specific service principal and (2) by using ADD Pod Identity._
 
 1. Obtain your Azure Account Subscription ID:
-   ```
-   AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
+
+   ```bash
+   AZURE_SUBSCRIPTION_ID=$(az account list --query '[?isDefault].id' -o tsv)
    ```
 
-2. Specify the role  
-There are two ways to specify the role: use the built-in role or create a custom one.  
+2. Specify the role
+There are two ways to specify the role: use the built-in role or create a custom one.
    You can use the Azure built-in role `Contributor`:
-   ```
+
+   ```bash
    AZURE_ROLE=Contributor
    ```
+
    This will have subscription-wide access, so protect the credential generated with this role.
-   
-   It is always best practice to assign the minimum required permissions necessary for an application to do its work.  
-   
+
+   It is always best practice to assign the minimum required permissions necessary for an application to do its work.
+
    Here are the minimum required permissions needed by Velero to perform backups, restores, and deletions:
    - Storage Account
-      - Microsoft.Storage/storageAccounts/listkeys/action 
-      - Microsoft.Storage/storageAccounts/regeneratekey/action  
+      - Microsoft.Storage/storageAccounts/listkeys/action
+      - Microsoft.Storage/storageAccounts/regeneratekey/action
    - Disk Management
       - Microsoft.Compute/disks/read
       - Microsoft.Compute/disks/write
@@ -191,27 +192,37 @@ There are two ways to specify the role: use the built-in role or create a custom
       - Microsoft.Compute/snapshots/delete
       - Microsoft.Compute/disks/beginGetAccess/action
       - Microsoft.Compute/disks/endGetAccess/action
-   
+
    Use the following commands to create a custom role which has the minimum required permissions:
-   ```
+
+   ```bash
    AZURE_ROLE=Velero
    az role definition create --role-definition '{
       "Name": "'$AZURE_ROLE'",
       "Description": "Velero related permissions to perform backups, restores and deletions",
       "Actions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+          "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action",
           "Microsoft.Compute/disks/read",
           "Microsoft.Compute/disks/write",
           "Microsoft.Compute/disks/endGetAccess/action",
           "Microsoft.Compute/disks/beginGetAccess/action",
           "Microsoft.Compute/snapshots/read",
           "Microsoft.Compute/snapshots/write",
-          "Microsoft.Compute/snapshots/delete",
-          "Microsoft.Storage/storageAccounts/listkeys/action",
-          "Microsoft.Storage/storageAccounts/regeneratekey/action"
+          "Microsoft.Compute/snapshots/delete"
       ],
+      "notActions": [],
+      "dataActions": [
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action"
+      ],
+      "notDataActions": [],
       "AssignableScopes": ["/subscriptions/'$AZURE_SUBSCRIPTION_ID'"]
       }'
    ```
+
    _(Optional) If you are using a different Subscription for backups and cluster resources, make sure to specify both subscriptions
    inside `AssignableScopes`._
 
@@ -222,7 +233,7 @@ There are two ways to specify the role: use the built-in role or create a custom
 1. Obtain your Azure Account Tenant ID:
 
     ```bash
-    AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
+    AZURE_TENANT_ID=$(az account list --query '[?isDefault].tenantId' -o tsv)
     ```
 
 2. Create a service principal.
@@ -235,16 +246,18 @@ There are two ways to specify the role: use the built-in role or create a custom
     in the `az` command using `--scopes`._
 
     ```bash
-    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role $AZURE_ROLE --query 'password' -o tsv \
-      --scopes  /subscriptions/$AZURE_SUBSCRIPTION_ID[ /subscriptions/$AZURE_BACKUP_SUBSCRIPTION_ID]`
+    SP_NAME="velero"
+    AZURE_CLIENT_SECRET=$(az ad sp create-for-rbac --name "$SP_NAME" --query 'password' -o tsv \
+      --role "$AZURE_ROLE" \
+      --scopes /subscriptions/$AZURE_SUBSCRIPTION_ID[ /subscriptions/$AZURE_BACKUP_SUBSCRIPTION_ID])
     ```
 
-    NOTE: Ensure that value for `--name` does not conflict with other service principals/app registrations.
+    NOTE: Ensure that value for `--name` (`$SP_NAME` variable) does not conflict with other service principals/app registrations.
 
     After creating the service principal, obtain the client id.
 
     ```bash
-    AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
+    AZURE_CLIENT_ID=$(az ad sp list --display-name "$SP_NAME" --query '[0].appId' -o tsv)
     ```
 
 3. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
@@ -281,9 +294,9 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
         --name $IDENTITY_NAME
 
     export IDENTITY_CLIENT_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $AZURE_SUBSCRIPTION_ID --query clientId -otsv)"
-    export IDENTITY_RESOURCE_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $AZURE_SUBSCRIPTION_ID --query id -otsv)"    
+    export IDENTITY_RESOURCE_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $AZURE_SUBSCRIPTION_ID --query id -otsv)"
     ```
-    
+
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique identity name per cluster rather than the default `velero`.
 
 2. Assign the identity a role:
@@ -329,7 +342,6 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
 
     > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
 
-
 ### Option 3: Use storage account access key
 
 _Note: this option is **not valid** if you are planning to take Azure snapshots of your managed disks with Velero._
@@ -337,7 +349,7 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
 1. Obtain your Azure Storage account access key:
 
     ```bash
-    AZURE_STORAGE_ACCOUNT_ACCESS_KEY=`az storage account keys list --account-name $AZURE_STORAGE_ACCOUNT_ID --query "[?keyName == 'key1'].value" -o tsv`
+    AZURE_STORAGE_ACCOUNT_ACCESS_KEY=$(az storage account keys list --account-name $AZURE_STORAGE_ACCOUNT_ID --query "[?keyName == 'key1'].value" -o tsv)
     ```
 
 1. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
@@ -369,7 +381,7 @@ velero install \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
-If you're using **AAD Pod Identity**, you now need to add the `aadpodidbinding=$IDENTITY_NAME` label to the Velero pod(s), preferably through the Deployment's pod template.  
+If you're using **AAD Pod Identity**, you now need to add the `aadpodidbinding=$IDENTITY_NAME` label to the Velero pod(s), preferably through the Deployment's pod template.
 
 **If using storage account access key and no Azure snapshots:**
 
@@ -386,14 +398,15 @@ velero install \
 Additionally, you can specify `--use-node-agent` to enable node agent support, and `--wait` to wait for the deployment to be ready.
 
 ### Optional installation steps
+
 1. Specify [additional configurable parameters][7] for the `--backup-location-config` flag.
 1. Specify [additional configurable parameters][8] for the `--snapshot-location-config` flag.
 1. [Customize the Velero installation][9] further to meet your needs.
 1. Velero does not officially [support for Windows containers][10]. If your cluster has both Windows and Linux agent pool, add a node selector to the `velero` deployment to run Velero only on the Linux nodes. This can be done using the below command.
+
     ```bash
     kubectl patch deploy velero --namespace velero --type merge --patch '{ \"spec\": { \"template\": { \"spec\": { \"nodeSelector\": { \"beta.kubernetes.io/os\": \"linux\"} } } } }'
     ```
-
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
@@ -403,6 +416,7 @@ If you are using Velero v1.6.0 or later, you can create additional Azure [Backup
 These can also be created alongside Backup Storage Locations that use other providers.
 
 ### Limitations
+
 It is not possible to use different credentials for additional Backup Storage Locations if you are pod based authentication such as [AAD Pod Identity][13].
 
 ### Prerequisites
@@ -486,4 +500,4 @@ To improve security within Azure, it's good practice [to disable public traffic 
 [27]: https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"
-[103]: https://github.com/vmware-tanzu/velero/issues/new/choose 
+[103]: https://github.com/vmware-tanzu/velero/issues/new/choose
