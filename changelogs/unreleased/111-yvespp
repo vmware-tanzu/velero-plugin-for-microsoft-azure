@@ -1,9 +1,0 @@
-## All changes
-
-- When service principal or managed identity is used the plugin has the option to access the blob storage directly without fetching a storage access key. This feature is enabled if resourceGroup or subscriptionId isn't set.
-  Requirements to enable direct access:
-  - subscriptionId and resourceGroup needs to be removed from backup-location-config.
-  - The identity accessing the storage account additionally needs the role "Storage Blob Data Contributor", else you will get this error in the velero log: `AuthorizationPermissionMismatch`.
-
-  Using direct access is recommended as it will be the default in a future release. (#111, @yvespp)
-- Switch to the Azure SDK for go (#111, @yvespp)
