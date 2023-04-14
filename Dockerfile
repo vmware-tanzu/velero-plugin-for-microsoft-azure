@@ -34,4 +34,4 @@ FROM scratch
 COPY --from=build /go/bin/velero-plugin-for-microsoft-azure /plugins/
 COPY --from=build /go/bin/cp-plugin /bin/cp-plugin
 USER 65532:65532
-ENTRYPOINT ["cp", "/plugins/velero-plugin-for-microsoft-azure", "/target/velero-plugin-for-microsoft-azure"]
+ENTRYPOINT ["cp-plugin", "/plugins/velero-plugin-for-microsoft-azure", "/target/velero-plugin-for-microsoft-azure"]
