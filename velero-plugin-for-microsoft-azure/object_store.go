@@ -227,19 +227,23 @@ func newObjectStore(logger logrus.FieldLogger) *ObjectStore {
 
 // get storage account key from env var whose name is in config[storageAccountKeyEnvVarConfigKey].
 func getStorageAccountKey(config map[string]string) (string, error) {
-	credentialsFile, err := selectCredentialsFile(config)
-	if err != nil {
-		return "", err
-	}
-	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
-		return "", err
-	}
 	secretKeyEnvVar := config[storageAccountKeyEnvVarConfigKey]
 	if secretKeyEnvVar != "" {
 		return os.Getenv(secretKeyEnvVar), nil
 	}
 
 	return "", nil
+}
+
+func populateEnvVarsFromCredentialsFile(config map[string]string) error {
+	credentialsFile, err := selectCredentialsFile(config)
+	if err != nil {
+		return err
+	}
+	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
+		return err
+	}
+	return nil
 }
 
 // getServiceClient creates a client via SharedKeyCredential or DefaultAzureCredential
@@ -315,6 +319,10 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		storageAccountKeyEnvVarConfigKey,
 		credentialsFileConfigKey,
 	); err != nil {
+		return err
+	}
+
+	if err := populateEnvVarsFromCredentialsFile(config); err != nil {
 		return err
 	}
 
