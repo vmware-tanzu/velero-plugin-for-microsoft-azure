@@ -49,6 +49,8 @@ const (
 	storageAccountConfigKey          = "storageAccount"
 	storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
 	blockSizeConfigKey               = "blockSizeInBytes"
+	storageAccountURIConfigKey       = "storageAccountURI"
+	useAADConfigKey                  = "useAAD"
 
 	// blocks must be less than/equal to 100MB in size
 	// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
@@ -212,11 +214,10 @@ func (b *azureBlob) GetSASURI(ttl time.Duration, sharedKeyCredential *azblob.Sha
 type ObjectStore struct {
 	log logrus.FieldLogger
 
-	containerGetter       containerGetter
-	blobGetter            blobGetter
-	blockSize             int
-	storageAccount        string
-	storageEndpointSuffix string
+	containerGetter containerGetter
+	blobGetter      blobGetter
+	blockSize       int
+	storageAccount  string
 	// we need to keep the credential here to create the sas url
 	sharedKeyCredential *azblob.SharedKeyCredential
 }
@@ -243,23 +244,21 @@ func getStorageAccountKey(config map[string]string) (string, error) {
 }
 
 // getServiceClient creates a client via SharedKeyCredential or DefaultAzureCredential
-func getServiceClient(storageAccount, subscription, resouceGroup string, sharedKeyCredential *azblob.SharedKeyCredential, cloud cloud.Configuration) (*service.Client, *azblob.SharedKeyCredential, error) {
+func getServiceClient(storageAccount, subscription, resouceGroup string, storageAccountURI string, useAAD string, sharedKeyCredential *azblob.SharedKeyCredential, cloud cloud.Configuration, log logrus.FieldLogger) (*service.Client, *azblob.SharedKeyCredential, error) {
 	localSharedKeyCredential := sharedKeyCredential
-	serviceURL := getBlobServicUrl(storageAccount, cloud.Services[Storage].Endpoint)
 	clientOptions := policy.ClientOptions{Cloud: cloud}
 	var serviceClient *service.Client
 
+	credential, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{ClientOptions: policy.ClientOptions{Cloud: cloud}})
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "error getting credentials from environment")
+	}
+	serviceURL := getBlobServicUrl(credential, clientOptions, subscription, resouceGroup, storageAccount, storageAccountURI, cloud.Services[Storage].Endpoint, log)
 	if sharedKeyCredential == nil {
 		// doc: https://github.com/Azure/azure-sdk-for-go/tree/main/sdk/azidentity
-		credential, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{ClientOptions: policy.ClientOptions{Cloud: cloud}})
-		if err != nil {
-			return nil, nil, errors.Wrap(err, "error getting credentials from environment")
-		}
-
-		// if subscription or resouceGroup isn't set use default credential to access the storage account
-		if subscription == "" || resouceGroup == "" {
+		if strings.ToLower(useAAD) == "true" {
 			serviceClient, err = service.NewClient(serviceURL, credential, &service.ClientOptions{ClientOptions: clientOptions})
-			return serviceClient, nil, err
+			return serviceClient, nil, errors.Wrapf(err, "error creating service client with AAD credentials for storage account %s", serviceURL)
 		}
 
 		// else fetch the storage account key
@@ -273,12 +272,29 @@ func getServiceClient(storageAccount, subscription, resouceGroup string, sharedK
 		}
 
 	}
-	serviceClient, err := service.NewClientWithSharedKeyCredential(serviceURL, localSharedKeyCredential, &service.ClientOptions{ClientOptions: clientOptions})
+	serviceClient, err = service.NewClientWithSharedKeyCredential(serviceURL, localSharedKeyCredential, &service.ClientOptions{ClientOptions: clientOptions})
 	return serviceClient, localSharedKeyCredential, err
 }
 
-func getBlobServicUrl(storageAccount, storageEndpointSuffix string) string {
-	return fmt.Sprintf("https://%s.blob.%s", storageAccount, storageEndpointSuffix)
+func getBlobServicUrl(credential *azidentity.DefaultAzureCredential, clientOptions policy.ClientOptions, subscription, resouceGroup, storageAccount, storageAccountURI, defaultStorageEndpointSuffix string, log logrus.FieldLogger) string {
+	// We pass in Uri, since we might need to validate this in future against GetProperties.
+	if storageAccountURI != "" {
+		return storageAccountURI
+	}
+	accountClient, err := armstorage.NewAccountsClient(subscription, credential, &arm.ClientOptions{ClientOptions: clientOptions})
+	if err != nil {
+		log.Debugf("error creating storage account client: %v,  falling back to default SA URL forming mechanism", err)
+	} else {
+		properties, err := accountClient.GetProperties(context.TODO(), resouceGroup, storageAccount, nil)
+		if err != nil {
+			log.Debugf("error getting storage account properties: %v, please provide Microsoft.Storage/storageAccounts/read, falling back to default SA URL forming mechanism", err)
+		} else {
+			return *properties.Account.Properties.PrimaryEndpoints.Blob
+		}
+	}
+
+	// fallback to default endpoint
+	return fmt.Sprintf("https://%s.blob.%s", storageAccount, defaultStorageEndpointSuffix)
 }
 
 // fetch the storage account key using the default credential.
@@ -308,10 +324,12 @@ func fetchStorageAccountKey(credential *azidentity.DefaultAzureCredential, clien
 func (o *ObjectStore) Init(config map[string]string) error {
 	var serviceClient *service.Client
 	if err := veleroplugin.ValidateObjectStoreConfigKeys(config,
-		resourceGroupConfigKey, // deprecated
+		resourceGroupConfigKey,
 		storageAccountConfigKey,
-		subscriptionIDConfigKey, // deprecated
+		subscriptionIDConfigKey,
 		blockSizeConfigKey,
+		storageAccountURIConfigKey,
+		useAADConfigKey,
 		storageAccountKeyEnvVarConfigKey,
 		credentialsFileConfigKey,
 	); err != nil {
@@ -329,7 +347,6 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
-	o.storageEndpointSuffix = cloudConfig.Services[Storage].Endpoint
 
 	o.log.Debugf("Getting storage key")
 	// optional
@@ -345,7 +362,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	}
 
 	o.log.Debugf("Creating service client")
-	serviceClient, o.sharedKeyCredential, err = getServiceClient(o.storageAccount, config[subscriptionIDConfigKey], config[resourceGroupConfigKey], o.sharedKeyCredential, cloudConfig)
+	serviceClient, o.sharedKeyCredential, err = getServiceClient(o.storageAccount, config[subscriptionIDConfigKey], config[resourceGroupConfigKey], config[storageAccountURIConfigKey], config[useAADConfigKey], o.sharedKeyCredential, cloudConfig, o.log)
 	if err != nil {
 		return err
 	}
