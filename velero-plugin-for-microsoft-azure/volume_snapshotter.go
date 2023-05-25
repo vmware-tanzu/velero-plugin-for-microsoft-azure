@@ -169,7 +169,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	if err != nil {
 		return errors.Wrap(err, "error creating disk client")
 	}
-	snapsClient, err := armcompute.NewSnapshotsClient(envVars[subscriptionIDEnvVar], credential, &arm.ClientOptions{ClientOptions: clientOptions})
+	snapsClient, err := armcompute.NewSnapshotsClient(snapshotsSubscriptionID, credential, &arm.ClientOptions{ClientOptions: clientOptions})
 	if err != nil {
 		return errors.Wrap(err, "error creating snapshot client")
 	}
