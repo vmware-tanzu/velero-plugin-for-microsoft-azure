@@ -46,6 +46,19 @@ spec:
     # Optional.
     subscriptionId: my-subscription
 
+    # URI of the blob endpoint of the storage account. 
+    # 
+    # Optional. This will ensure that velero uses the provided URI to communicate to the Storage Account, 
+    # and it will not try to fetch the Endpoint by making an ARM call.
+    # If this field is provided then resourceGroup, subscriptionId can be left empty
+    storageAccountURI: my-sa.blob.core.windows.net
+
+    # Boolean parameter to decide whether to use AAD for authenticating with the storage account. 
+    # If false/ not provided, plugin will fallback to using ListKeys
+    #
+    # Optional. Recommended.
+    useAAD: "true"
+
     # The block size, in bytes, to use when uploading objects to Azure blob storage.
     # See https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs#about-block-blobs
     # for more information on block blobs.

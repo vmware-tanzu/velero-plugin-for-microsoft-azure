@@ -176,10 +176,24 @@ There are two ways to specify the role: use the built-in role or create a custom
    
    It is always best practice to assign the minimum required permissions necessary for an application to do its work.  
    
+   > Note: With useAAD flag you will need to provide extra permissions `Storage Blob Data Contributor` covered in point 3 of section: [Create service principal](#create-service-principal)
+
    Here are the minimum required permissions needed by Velero to perform backups, restores, and deletions:
    - Storage Account
-      - Microsoft.Storage/storageAccounts/listkeys/action 
+      > Back Compatability and Restic
+      - Microsoft.Storage/storageAccounts/listkeys/action  
       - Microsoft.Storage/storageAccounts/regeneratekey/action  
+      > AAD Based Auth
+      - Microsoft.Storage/storageAccounts/blobServices/containers/delete
+      - Microsoft.Storage/storageAccounts/blobServices/containers/read
+      - Microsoft.Storage/storageAccounts/blobServices/containers/write
+      - Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action
+      > Data Actions for AAD auth
+      - Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete
+      - Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read
+      - Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write
+      - Microsoft.Storage/storageAccounts/blobServices/containers/blobs/move/action
+      - Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action
    - Disk Management
       - Microsoft.Compute/disks/read
       - Microsoft.Compute/disks/write
@@ -207,8 +221,19 @@ There are two ways to specify the role: use the built-in role or create a custom
           "Microsoft.Compute/snapshots/write",
           "Microsoft.Compute/snapshots/delete",
           "Microsoft.Storage/storageAccounts/listkeys/action",
-          "Microsoft.Storage/storageAccounts/regeneratekey/action"
+          "Microsoft.Storage/storageAccounts/regeneratekey/action",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/delete",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/read",
+          "Microsoft.Storage/storageAccounts/blobServices/containers/write",
+          "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action",
       ],
+      "DataActions" :[
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/delete",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/read",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/write",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/move/action",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/add/action"
+      ]
       "AssignableScopes": ["/subscriptions/'$AZURE_SUBSCRIPTION_ID'"]
       }'
    ```
@@ -246,8 +271,16 @@ There are two ways to specify the role: use the built-in role or create a custom
     ```bash
     AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
     ```
+3. Assign Additional permissions to the service principal (For Latest Azure Plugin >=1.8.0 with useAAD=true)
 
-3. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
+    If you chose the AAD route, this is an additional permissions required for the service principal to be able to access the storage account.
+    ```bash
+    az role assignment create --assignee $AZURE_CLIENT_ID --role "Storage Blob Data Contributor" --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
+    ```
+
+    Refer: [useAAD parameter in BackupStorageLocation.md](./backupstoragelocation.md#backup-storage-location)
+
+4. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
 
     ```bash
     cat << EOF  > ./credentials-velero
@@ -357,7 +390,58 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
 
 Install Velero, including all prerequisites, into the cluster and start the deployment. This will create a namespace called `velero`, and place a deployment named `velero` in it.
 
-**If using service principal or AAD Pod Identity:**
+### If using service principal or AAD Pod Identity:
+
+#### For Latest Azure Plugin >= 1.8.0
+In latest plugin, users can chose to use AAD route for velero to access storage account. Earlier this was done using ListKeys on the storage account which is not a recommended practice.
+
+```bash
+velero install \
+    --provider azure \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
+    --bucket $BLOB_CONTAINER \
+    --secret-file ./credentials-velero \
+    --backup-location-config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
+```
+
+Limitation: The velero identity needs Reader permission alongside the "storage blob data contributor" role on the storage account. This is because the identity needs to be able to read the storage account properties to fetch the storage account's blob endpoint (azure storage accounts are no longer expected to follow the format of blob.core.windows.net with introduction of DNS zone storage accounts.). To circumvent this issue follow the steps below:
+
+**For users facing Storage Account Throttling issues**
+You can chose to provide the Storage Account's blob endpoint directly to Velero. This will help Velero to bypass the need to fetch the storage account properties and hence the need for Reader permission on the storage account. This can be done by providing the blob endpoint in the backup-location-config as shown below:
+
+```bash
+velero install \
+    --provider azure \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
+    --bucket $BLOB_CONTAINER \
+    --secret-file ./credentials-velero \
+    --backup-location-config storageAccountURI="xxxxxx.blob.core.windows.net",useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
+```
+
+Note:
+-  ARM calls such as ListKeys and GetProperties are the most likely to get throttled, so if you are facing throttling issues, you can try to provide the blob endpoint directly to Velero post which velero will directly talk to storage.
+- If you have provided the storageAccountUri, providing the resourceGroup and storageAccount fields are optional.
+
+**Migrating from ListKeys to AAD route:**
+If you already had a velero setup using azure plugin < 1.8.0 it must be using the ListKeys approach which is not recommended. To migrate to the AAD route follow the steps below:
+
+You need to assign your velero identity the following permissions:
+
+```bash
+az role assignment create --role "Storage Blob Data Contributor" --assignee $IDENTITY_CLIENT_ID --scope /subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_BACKUP_RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$AZURE_STORAGE_ACCOUNT_ID
+```
+
+After that update your velero BackupStorageLocation with the useAAD flag as shown below:
+
+```bash
+velero backup-location set default --provider azure --bucket $BLOB_CONTAINER --config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
+```
+
+Limitation: Listing storage account access key is still needed for Restic/Kopia to work as expected on Azure. Tracking Issue: [#5984](https://github.com/vmware-tanzu/velero/issues/5984). The useAAD route won't accrue to them and users using kopia/restic should not remove the ListKeys permission from the velero identity.
+
+#### For Azure Plugin < 1.8.0
 
 ```bash
 velero install \
@@ -369,9 +453,9 @@ velero install \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
-If you're using **AAD Pod Identity**, you now need to add the `aadpodidbinding=$IDENTITY_NAME` label to the Velero pod(s), preferably through the Deployment's pod template.  
+If you're using **AAD Pod Identity**, you now need to add the `aadpodidbinding=$IDENTITY_NAME` label to the Velero pod(s), preferably through the Deployment's pod template.  `
 
-**If using storage account access key and no Azure snapshots:**
+### If using storage account access key and no Azure snapshots:
 
 ```bash
 velero install \
