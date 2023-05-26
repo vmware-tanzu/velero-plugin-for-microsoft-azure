@@ -370,7 +370,11 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	}
 
 	o.log.Debugf("Creating service client")
-	serviceClient, o.sharedKeyCredential, err = getServiceClient(o.storageAccount, config[subscriptionIDConfigKey], config[resourceGroupConfigKey], config[storageAccountURIConfigKey], config[useAADConfigKey], o.sharedKeyCredential, cloudConfig, o.log)
+	subscriptionID := config[subscriptionIDConfigKey]
+	if len(subscriptionID) == 0 {
+		subscriptionID = os.Getenv(subscriptionIDEnvVar)
+	}
+	serviceClient, o.sharedKeyCredential, err = getServiceClient(o.storageAccount, subscriptionID, config[resourceGroupConfigKey], config[storageAccountURIConfigKey], config[useAADConfigKey], o.sharedKeyCredential, cloudConfig, o.log)
 	if err != nil {
 		return err
 	}
