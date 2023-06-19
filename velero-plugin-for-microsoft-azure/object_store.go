@@ -256,8 +256,8 @@ func getServiceClient(storageAccount, subscription, resouceGroup string, sharedK
 			return nil, nil, errors.Wrap(err, "error getting credentials from environment")
 		}
 
-		// if subscription or resouceGroup isn't set use default credential to access the storage account
-		if subscription == "" || resouceGroup == "" {
+		// if resouceGroup isn't set use default credential to access the storage account
+		if resouceGroup == "" {
 			serviceClient, err = service.NewClient(serviceURL, credential, &service.ClientOptions{ClientOptions: clientOptions})
 			return serviceClient, nil, err
 		}
@@ -345,7 +345,11 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	}
 
 	o.log.Debugf("Creating service client")
-	serviceClient, o.sharedKeyCredential, err = getServiceClient(o.storageAccount, config[subscriptionIDConfigKey], config[resourceGroupConfigKey], o.sharedKeyCredential, cloudConfig)
+	subscriptionID := config[subscriptionIDConfigKey]
+	if len(subscriptionID) == 0 {
+		subscriptionID = os.Getenv(subscriptionIDEnvVar)
+	}
+	serviceClient, o.sharedKeyCredential, err = getServiceClient(o.storageAccount, subscriptionID, config[resourceGroupConfigKey], o.sharedKeyCredential, cloudConfig)
 	if err != nil {
 		return err
 	}
