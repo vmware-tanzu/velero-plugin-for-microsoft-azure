@@ -10,7 +10,7 @@ This repository contains these plugins to support running Velero on Microsoft Az
 - An object store plugin for persisting and retrieving backups on Azure Blob Storage. Content of backup is kubernetes resources and metadata files for CSI objects, progress of async operations. It is also used to store the result data of backups and restores include log files, warning/error files, etc.
 
 - A volume snapshotter plugin for creating snapshots from volumes (during a backup) and volumes from snapshots (during a restore) on Azure Managed Disks.
-  - Since v1.4.0 the snapshotter plugin can handle the volumes provisioned by CSI driver `disk.csi.azure.com`
+  - Since v1.4.0 the snapshotter plugin can handle the volumes provisioned by CSI driver `disk.csi.azure.com`.
   - Since v1.5.0 the snapshotter plugin can handle the zone-redundant storage(ZRS) managed disks which can be used to support backup/restore across different available zones.
 
 ## Compatibility
@@ -225,7 +225,7 @@ There are two ways to specify the role: use the built-in role or create a custom
           "Microsoft.Storage/storageAccounts/blobServices/containers/delete",
           "Microsoft.Storage/storageAccounts/blobServices/containers/read",
           "Microsoft.Storage/storageAccounts/blobServices/containers/write",
-          "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action",
+          "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action"
       ],
       "DataActions" :[
         "Microsoft.Storage/storageAccounts/blobServices/containers/blob/delete",
@@ -233,7 +233,7 @@ There are two ways to specify the role: use the built-in role or create a custom
         "Microsoft.Storage/storageAccounts/blobServices/containers/blob/write",
         "Microsoft.Storage/storageAccounts/blobServices/containers/blob/move/action",
         "Microsoft.Storage/storageAccounts/blobServices/containers/blob/add/action"
-      ]
+      ],
       "AssignableScopes": ["/subscriptions/'$AZURE_SUBSCRIPTION_ID'"]
       }'
    ```
