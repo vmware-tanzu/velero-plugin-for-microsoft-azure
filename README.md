@@ -287,11 +287,10 @@ There are two ways to specify the role: use the built-in role or create a custom
     AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
     AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
     AZURE_CLOUD_NAME=AzurePublicCloud
-    AZURE_ENVIRONMENT=AzurePublicCloud
     EOF
     ```
 
-    > Available values for `AZURE_CLOUD_NAME` and `AZURE_ENVIRONMENT`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`. `AZURE_ENVIRONMENT` is NOT required for `AzurePublicCloud`
+    > Available values for `AZURE_CLOUD_NAME`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
 ### Option 2: Use Azure AD Workload Identity
 
@@ -395,11 +394,10 @@ Before proceeding, ensure that you have installed [workload identity mutating ad
     AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
     AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
     AZURE_CLOUD_NAME=AzurePublicCloud
-    AZURE_ENVIRONMENT=AzurePublicCloud
     EOF
     ```
 
-    > Available values for `AZURE_CLOUD_NAME` and `AZURE_ENVIRONMENT`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`. `AZURE_ENVIRONMENT` is NOT required for `AzurePublicCloud`
+    > Available values for `AZURE_CLOUD_NAME`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
 
 ### Option 3: Use storage account access key
@@ -418,11 +416,10 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
     cat << EOF  > ./credentials-velero
     AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
     AZURE_CLOUD_NAME=AzurePublicCloud
-    AZURE_ENVIRONMENT=AzurePublicCloud
     EOF
     ```
 
-    > Available values for `AZURE_CLOUD_NAME` and `AZURE_ENVIRONMENT`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`. `AZURE_ENVIRONMENT` is NOT required for `AzurePublicCloud`
+    > Available values for `AZURE_CLOUD_NAME`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
 ## Install and start Velero
 
@@ -491,7 +488,7 @@ After that update your velero BackupStorageLocation with the useAAD flag as show
 velero backup-location set default --provider azure --bucket $BLOB_CONTAINER --config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
-Limitation: Listing storage account access key is still needed for Restic/Kopia to work as expected on Azure. Tracking Issue: [#5984](https://github.com/vmware-tanzu/velero/issues/5984). The useAAD route won't accrue to them and users using kopia/restic should not remove the ListKeys permission from the velero identity.
+Limitation: Listing storage account access key is still needed for Restic to work as expected on Azure. The useAAD route won't accrue to it and users using Restic should not remove the ListKeys permission from the velero identity.
 
 ### If using storage account access key and no Azure snapshots:
 

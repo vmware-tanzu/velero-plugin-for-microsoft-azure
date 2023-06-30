@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -28,15 +27,14 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	azruntime "github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute"
 	uuid "github.com/gofrs/uuid"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/util/azure"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,12 +42,14 @@ import (
 )
 
 const (
-	resourceGroupEnvVar = "AZURE_RESOURCE_GROUP"
+	credentialsFileConfigKey = "credentialsFile"
 
-	apiTimeoutConfigKey                       = "apiTimeout"
-	snapsIncrementalConfigKey                 = "incremental"
-	snapsTagsConfigKey                        = "tags"
-	snapsActiveDirectoryAuthorityURIConfigKey = "activeDirectoryAuthorityURI"
+	vslConfigKeyActiveDirectoryAuthorityURI = "activeDirectoryAuthorityURI"
+	vslConfigKeySubscriptionID              = "subscriptionId"
+	vslConfigKeyResourceGroup               = "resourceGroup"
+	vslConfigKeyAPITimeout                  = "apiTimeout"
+	vslConfigKeyIncremental                 = "incremental"
+	vslConfigKeyTags                        = "tags"
 
 	snapshotsResource = "snapshots"
 	disksResource     = "disks"
@@ -87,118 +87,73 @@ func newVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	if err := veleroplugin.ValidateVolumeSnapshotterConfigKeys(config,
-		resourceGroupConfigKey,
-		apiTimeoutConfigKey,
-		subscriptionIDConfigKey,
-		snapsIncrementalConfigKey,
-		snapsTagsConfigKey,
+		vslConfigKeyResourceGroup,
+		vslConfigKeyAPITimeout,
+		vslConfigKeyResourceGroup,
+		vslConfigKeyIncremental,
+		vslConfigKeyTags,
 		credentialsFileConfigKey,
 	); err != nil {
 		return err
 	}
 
-	credentialsFile, err := selectCredentialsFile(config)
+	creds, err := azure.LoadCredentials(config)
 	if err != nil {
 		return err
 	}
-	if err := loadCredentialsIntoEnv(credentialsFile); err != nil {
-		return err
+	b.disksSubscription = creds[azure.CredentialKeySubscriptionID]
+	if b.disksSubscription == "" {
+		return errors.Errorf("%s is required in credential file", azure.CredentialKeySubscriptionID)
+	}
+	b.disksResourceGroup = creds[azure.CredentialKeyResourceGroup]
+	if b.disksResourceGroup == "" {
+		return errors.Errorf("%s is required in credential file", azure.CredentialKeyResourceGroup)
 	}
 
-	// we need AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
-	envVars, err := getRequiredValues(os.Getenv, subscriptionIDEnvVar, resourceGroupEnvVar)
-	if err != nil {
-		return errors.Wrap(err, "unable to get all required environment variables")
-	}
+	b.snapsSubscription = azure.GetFromLocationConfigOrCredential(config, creds, vslConfigKeySubscriptionID, azure.CredentialKeySubscriptionID)
+	b.snapsResourceGroup = azure.GetFromLocationConfigOrCredential(config, creds, vslConfigKeyResourceGroup, azure.CredentialKeyResourceGroup)
 
-	// set a different subscriptionId for snapshots if specified
-	snapshotsSubscriptionID := envVars[subscriptionIDEnvVar]
-	if val := config[subscriptionIDConfigKey]; val != "" {
-		// if subscription was set in config, it is required to also set the resource group
-		if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey); err != nil {
-			return errors.Wrap(err, "resourceGroup not specified, but is a requirement when backing up to a different subscription")
-		}
-		snapshotsSubscriptionID = val
-	}
-
-	// Get Azure cloudConfig from AZURE_CLOUD_NAME, if it exists. If the env var does not
-	// exist, cloudFromName will return AzurePublic.
-	cloudConfig, err := cloudFromName(os.Getenv(cloudNameEnvVar))
-	if err != nil {
-		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
-	}
-
-	// Update active directory authority host if it is set in the configuration
-	if config[snapsActiveDirectoryAuthorityURIConfigKey] != "" {
-		cloudConfig.ActiveDirectoryAuthorityHost = config[snapsActiveDirectoryAuthorityURIConfigKey]
-	}
-
-	// if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
-	var apiTimeout time.Duration
-	if val := config[apiTimeoutConfigKey]; val == "" {
-		apiTimeout = 2 * time.Minute
-	} else {
-		apiTimeout, err = time.ParseDuration(val)
+	b.apiTimeout = 2 * time.Minute
+	if val := config[vslConfigKeyAPITimeout]; val != "" {
+		b.apiTimeout, err = time.ParseDuration(val)
 		if err != nil {
-			return errors.Wrapf(err, "unable to parse value %q for config key %q (expected a duration string)", val, apiTimeoutConfigKey)
+			return errors.Wrapf(err, "unable to parse value %q for config key %q (expected a duration string)", val, vslConfigKeyAPITimeout)
 		}
 	}
 
-	clientOptions := policy.ClientOptions{Cloud: cloudConfig}
-	credential, err := azidentity.NewDefaultAzureCredential(&azidentity.DefaultAzureCredentialOptions{ClientOptions: clientOptions})
-	if err != nil {
-		return errors.Wrap(err, "error getting credentials from environment")
-	}
-
-	// if config["snapsIncrementalConfigKey"] is empty, default to nil; otherwise, parse it
-	var snapshotsIncremental *bool
-	if val := config[snapsIncrementalConfigKey]; val != "" {
+	if val := config[vslConfigKeyIncremental]; val != "" {
 		parseIncremental, err := strconv.ParseBool(val)
 		if err != nil {
-			return errors.Wrapf(err, "unable to parse value %q for config key %q (expected a boolean value)", val, snapsIncrementalConfigKey)
+			return errors.Wrapf(err, "unable to parse value %q for config key %q (expected a boolean value)", val, vslConfigKeyIncremental)
 		}
-		snapshotsIncremental = &parseIncremental
-	} else {
-		snapshotsIncremental = nil
+		b.snapsIncremental = &parseIncremental
 	}
 
-	var snapsTags map[string]string
-	if val := config[snapsTagsConfigKey]; val != "" {
-		snapsTags, err = util.ConvertTagsToMap(val)
+	if val := config[vslConfigKeyTags]; val != "" {
+		b.snapsTags, err = util.ConvertTagsToMap(val)
 		if err != nil {
-			return errors.Wrapf(err, "unable to parse value %q for config key %q (the valid format is \"key1=value1,key2=value2\")", val, snapsTagsConfigKey)
+			return errors.Wrapf(err, "unable to parse value %q for config key %q (the valid format is \"key1=value1,key2=value2\")", val, vslConfigKeyTags)
 		}
 	}
 
-	// set up clients
-	disksClient, err := armcompute.NewDisksClient(envVars[subscriptionIDEnvVar], credential, &arm.ClientOptions{ClientOptions: clientOptions})
+	clientOptions, err := azure.GetClientOptions(config, creds)
+	if err != nil {
+		return err
+	}
+	credential, err := azure.NewCredential(creds, clientOptions)
+	if err != nil {
+		return err
+	}
+
+	b.disks, err = armcompute.NewDisksClient(b.disksSubscription, credential, &arm.ClientOptions{ClientOptions: clientOptions})
 	if err != nil {
 		return errors.Wrap(err, "error creating disk client")
 	}
-	snapsClient, err := armcompute.NewSnapshotsClient(snapshotsSubscriptionID, credential, &arm.ClientOptions{ClientOptions: clientOptions})
+
+	b.snaps, err = armcompute.NewSnapshotsClient(b.snapsSubscription, credential, &arm.ClientOptions{ClientOptions: clientOptions})
 	if err != nil {
 		return errors.Wrap(err, "error creating snapshot client")
 	}
-
-	b.disks = disksClient
-	b.snaps = snapsClient
-	b.disksSubscription = envVars[subscriptionIDEnvVar]
-	b.snapsSubscription = snapshotsSubscriptionID
-	b.disksResourceGroup = envVars[resourceGroupEnvVar]
-	b.snapsResourceGroup = config[resourceGroupConfigKey]
-
-	// if no resource group was explicitly specified in 'config',
-	// use the value from the env var (i.e. the same one as where
-	// the cluster & disks are)
-	if b.snapsResourceGroup == "" {
-		b.snapsResourceGroup = envVars[resourceGroupEnvVar]
-	}
-
-	b.apiTimeout = apiTimeout
-
-	b.snapsIncremental = snapshotsIncremental
-
-	b.snapsTags = snapsTags
 
 	return nil
 }
