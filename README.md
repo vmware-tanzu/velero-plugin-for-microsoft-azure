@@ -19,15 +19,11 @@ Below is a listing of plugin versions and respective Velero versions that are co
 
 | Plugin Version | Velero Version |
 |----------------|----------------|
+| v1.7.x         | v1.11.x        |
 | v1.6.x         | v1.10.x        |
 | v1.5.x         | v1.9.x         |
 | v1.4.x         | v1.8.x         |
 | v1.3.x         | v1.7.x         |
-| v1.2.x         | v1.6.x         |
-| v1.1.x         | v1.5.x         |
-| v1.1.x         | v1.4.x         |
-| v1.0.x         | v1.3.x         |
-| v1.0.x         | v1.2.0         |
 
 
 ## Filing issues
@@ -152,14 +148,14 @@ of your cluster's resources before continuing._
 
 ## Set permissions for Velero
 
-There are several ways Velero can authenticate to Azure: (1) by using a Velero-specific [service principal][20]; (2) by using [AAD Pod Identity][23]; or (3) by using a storage account access key.
+There are several ways Velero can authenticate to Azure: (1) by using a Velero-specific [service principal][20]; (2) by using [Azure AD Workload Identity][23]; or (3) by using a storage account access key.
 
-If you plan to use Velero to take Azure snapshots of your persistent volume managed disks, you **must** use the service principal or AAD Pod Identity method.
+If you plan to use Velero to take Azure snapshots of your persistent volume managed disks, you **must** use the service principal or Azure AD Workload Identity method.
 
 If you don't plan to take Azure disk snapshots, any method is valid.
 
 ### Specify Role
-_**Note**: This is only required for (1) by using a Velero-specific service principal and  (2) by using ADD Pod Identity._  
+_**Note**: This is only required for (1) by using a Velero-specific service principal and  (2) by using Azure AD Workload Identity._  
 
 1. Obtain your Azure Account Subscription ID:
    ```
@@ -242,8 +238,6 @@ There are two ways to specify the role: use the built-in role or create a custom
 
 ### Option 1: Create service principal
 
-#### Create service principal
-
 1. Obtain your Azure Account Tenant ID:
 
     ```bash
@@ -271,7 +265,9 @@ There are two ways to specify the role: use the built-in role or create a custom
     ```bash
     AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
     ```
-3. Assign Additional permissions to the service principal (For Latest Azure Plugin >=1.8.0 with useAAD=true)
+3. (Optional)Assign additional permissions to the service principal (For useAAD=true with built-in role)
+
+    If you use the custom role which has the blob data permissions, skip this step.
 
     If you chose the AAD route, this is an additional permissions required for the service principal to be able to access the storage account.
     ```bash
@@ -293,64 +289,104 @@ There are two ways to specify the role: use the built-in role or create a custom
     EOF
     ```
 
-    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
-### Option 2: Use AAD Pod Identity
+### Option 2: Use Azure AD Workload Identity
 
-These instructions have been adapted from the [aad-pod-identity documentation][24].
+These instructions have been adapted from the [Azure AD Workload Identity Quick Start][24] documentation.
 
-Before proceeding, ensure that you have installed and configured [aad-pod-identity][23] for your cluster.
-
-#### Create identity
+Before proceeding, ensure that you have installed [workload identity mutating admission webhook][28] and [enabled the OIDC Issuer][29] for your cluster.
 
 1. Create an identity for Velero:
 
     ```bash
-    export IDENTITY_NAME=velero
+    IDENTITY_NAME=velero
 
     az identity create \
         --subscription $AZURE_SUBSCRIPTION_ID \
         --resource-group $AZURE_RESOURCE_GROUP \
         --name $IDENTITY_NAME
 
-    export IDENTITY_CLIENT_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $AZURE_SUBSCRIPTION_ID --query clientId -otsv)"
-    export IDENTITY_RESOURCE_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $AZURE_SUBSCRIPTION_ID --query id -otsv)"    
+    IDENTITY_CLIENT_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $AZURE_SUBSCRIPTION_ID --query clientId -otsv)"
     ```
     
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique identity name per cluster rather than the default `velero`.
 
-2. Assign the identity a role:
+2. Assign the identity roles:
 
     ```bash
-    export IDENTITY_ASSIGNMENT_ID="$(az role assignment create --role $AZURE_ROLE --assignee $IDENTITY_CLIENT_ID --scope /subscriptions/$AZURE_SUBSCRIPTION_ID --query id -otsv)"
+    az role assignment create --role $AZURE_ROLE --assignee $IDENTITY_CLIENT_ID --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
     ```
 
-3. In the cluster, create an `AzureIdentity` and `AzureIdentityBinding`:
+    (Optional)Assign additional permissions to the service principal (For useAAD=true with built-in role)
+
+    If you use the custom role which has the blob data permissions, skip this step.
+
+    If you chose the AAD route, this is an additional permissions required for the identity to be able to access the storage account.
+    ```bash
+    az role assignment create --assignee $IDENTITY_CLIENT_ID --role "Storage Blob Data Contributor" --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
+    ```
+
+    Refer: [useAAD parameter in BackupStorageLocation.md](./backupstoragelocation.md#backup-storage-location)
+
+3. Create a service account for Velero
 
     ```bash
+    # create namespace
+    kubectl create namespace velero
+
+    # create service account
     cat <<EOF | kubectl apply -f -
-    apiVersion: "aadpodidentity.k8s.io/v1"
-    kind: AzureIdentity
+    apiVersion: v1
+    kind: ServiceAccount
     metadata:
-      name: $IDENTITY_NAME
-    spec:
-      type: 0
-      resourceID: $IDENTITY_RESOURCE_ID
-      clientID: $IDENTITY_CLIENT_ID
+      annotations:
+        azure.workload.identity/client-id: $IDENTITY_CLIENT_ID
+      name: velero
+      namespace: velero
     EOF
 
+    # create clusterrolebinding
     cat <<EOF | kubectl apply -f -
-    apiVersion: "aadpodidentity.k8s.io/v1"
-    kind: AzureIdentityBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
     metadata:
-      name: $IDENTITY_NAME-binding
-    spec:
-      azureIdentity: $IDENTITY_NAME
-      selector: $IDENTITY_NAME
+      name: velero
+    subjects:
+    - kind: ServiceAccount
+      name: velero
+      namespace: velero
+    roleRef:
+      kind: ClusterRole
+      name: cluster-admin
+      apiGroup: rbac.authorization.k8s.io
     EOF
     ```
 
-4. Create a file that contains all the relevant environment variables:
+4. Get the cluster OIDC issuer URL
+    
+    ```bash
+    CLUSTER_RESOURCE_GROUP=<NAME_OF_CLUSTER_RESOURCE_GROUP>  
+    ```
+    **WARNING**: If you're using [AKS][25], `CLUSTER_RESOURCE_GROUP` must be set to the name of the resource group where the cluster is created, not the auto-generated resource group that is created when you provision your cluster in Azure.  
+
+    ```bash
+    CLUSTER_NAME=your_cluster_name
+
+    SERVICE_ACCOUNT_ISSUER=$(az aks show --resource-group $CLUSTER_RESOURCE_GROUP --name $CLUSTER_NAME --query "oidcIssuerProfile.issuerUrl" -o tsv)
+    ```
+
+5. Establish federated identity credential between the identity and the service account issuer & subject
+    ```bash
+    az identity federated-credential create \
+      --name "kubernetes-federated-credential" \
+      --identity-name "${IDENTITY_NAME}" \
+      --resource-group "${AZURE_RESOURCE_GROUP}" \
+      --issuer "${SERVICE_ACCOUNT_ISSUER}" \
+      --subject "system:serviceaccount:velero:velero"
+    ```
+
+6. Create a file that contains all the relevant environment variables:
 
     ```bash
     cat << EOF  > ./credentials-velero
@@ -360,7 +396,7 @@ Before proceeding, ensure that you have installed and configured [aad-pod-identi
     EOF
     ```
 
-    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
 
 ### Option 3: Use storage account access key
@@ -382,7 +418,7 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
     EOF
     ```
 
-    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
 ## Install and start Velero
 
@@ -390,22 +426,35 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
 
 Install Velero, including all prerequisites, into the cluster and start the deployment. This will create a namespace called `velero`, and place a deployment named `velero` in it.
 
-### If using service principal or AAD Pod Identity:
-
-#### For Latest Azure Plugin >= 1.8.0
-In latest plugin, users can chose to use AAD route for velero to access storage account. Earlier this was done using ListKeys on the storage account which is not a recommended practice.
+### If using service principal:
 
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
-Limitation: The velero identity needs Reader permission alongside the "storage blob data contributor" role on the storage account. This is because the identity needs to be able to read the storage account properties to fetch the storage account's blob endpoint (azure storage accounts are no longer expected to follow the format of blob.core.windows.net with introduction of DNS zone storage accounts.). To circumvent this issue follow the steps below:
+### If using Azure AD Workload Identity:
+
+```bash
+velero install \
+    --provider azure \
+    --service-account-name velero \
+    --pod-labels azure.workload.identity/use=true \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
+    --bucket $BLOB_CONTAINER \
+    --secret-file ./credentials-velero \
+    --backup-location-config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
+```
+
+In plugin v1.8.0+, users can chose to use AAD route for velero to access storage account when using service principal or Azure AD Workload Identity. Earlier this was done using ListKeys on the storage account which is not a recommended practice.
+
+**Limitation:** The velero identity needs Reader permission alongside the "storage blob data contributor" role on the storage account. This is because the identity needs to be able to read the storage account properties to fetch the storage account's blob endpoint (azure storage accounts are no longer expected to follow the format of blob.core.windows.net with introduction of DNS zone storage accounts.). To circumvent this issue follow the steps below:
 
 **For users facing Storage Account Throttling issues**
 You can chose to provide the Storage Account's blob endpoint directly to Velero. This will help Velero to bypass the need to fetch the storage account properties and hence the need for Reader permission on the storage account. This can be done by providing the blob endpoint in the backup-location-config as shown below:
@@ -413,7 +462,7 @@ You can chose to provide the Storage Account's blob endpoint directly to Velero.
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config storageAccountURI="xxxxxx.blob.core.windows.net",useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
@@ -421,7 +470,6 @@ velero install \
 ```
 
 Note:
--  ARM calls such as ListKeys and GetProperties are the most likely to get throttled, so if you are facing throttling issues, you can try to provide the blob endpoint directly to Velero post which velero will directly talk to storage.
 - If you have provided the storageAccountUri, providing the resourceGroup and storageAccount fields are optional.
 
 **Migrating from ListKeys to AAD route:**
@@ -441,26 +489,12 @@ velero backup-location set default --provider azure --bucket $BLOB_CONTAINER --c
 
 Limitation: Listing storage account access key is still needed for Restic/Kopia to work as expected on Azure. Tracking Issue: [#5984](https://github.com/vmware-tanzu/velero/issues/5984). The useAAD route won't accrue to them and users using kopia/restic should not remove the ListKeys permission from the velero identity.
 
-#### For Azure Plugin < 1.8.0
-
-```bash
-velero install \
-    --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
-    --bucket $BLOB_CONTAINER \
-    --secret-file ./credentials-velero \
-    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
-    --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
-```
-
-If you're using **AAD Pod Identity**, you now need to add the `aadpodidbinding=$IDENTITY_NAME` label to the Velero pod(s), preferably through the Deployment's pod template.  `
-
 ### If using storage account access key and no Azure snapshots:
 
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.6.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
@@ -487,7 +521,7 @@ If you are using Velero v1.6.0 or later, you can create additional Azure [Backup
 These can also be created alongside Backup Storage Locations that use other providers.
 
 ### Limitations
-It is not possible to use different credentials for additional Backup Storage Locations if you are pod based authentication such as [AAD Pod Identity][13].
+It is not possible to use different credentials for additional Backup Storage Locations if you are pod based authentication such as [Azure AD Workload Identity][23].
 
 ### Prerequisites
 
@@ -556,18 +590,19 @@ To improve security within Azure, it's good practice [to disable public traffic 
 [11]: https://velero.io/docs/faq/
 [12]: #create-an-additional-backup-storage-location
 [13]: https://velero.io/docs/latest/api-types/backupstoragelocation/
-[14]: #option-2-use-aad-pod-identity
 [15]: #option-1-create-service-principal
 [16]: #option-3-use-storage-account-access-key
 [17]: https://kubernetes.io/docs/concepts/configuration/secret/
 [20]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [21]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [22]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
-[23]: https://github.com/Azure/aad-pod-identity
-[24]: https://github.com/Azure/aad-pod-identity#demo
+[23]: https://azure.github.io/azure-workload-identity/docs/introduction.html
+[24]: https://azure.github.io/azure-workload-identity/docs/quick-start.html
 [25]: https://azure.microsoft.com/en-us/services/kubernetes-service/
 [26]: https://docs.microsoft.com/en-us/azure/storage/common/storage-network-security
 [27]: https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview
+[28]: https://azure.github.io/azure-workload-identity/docs/installation/mutating-admission-webhook.html
+[29]: https://learn.microsoft.com/en-us/azure/aks/use-oidc-issuer#create-an-aks-cluster-with-oidc-issuer
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"
 [103]: https://github.com/vmware-tanzu/velero/issues/new/choose 
