@@ -224,11 +224,11 @@ There are two ways to specify the role: use the built-in role or create a custom
           "Microsoft.Storage/storageAccounts/blobServices/generateUserDelegationKey/action"
       ],
       "DataActions" :[
-        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/delete",
-        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/read",
-        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/write",
-        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/move/action",
-        "Microsoft.Storage/storageAccounts/blobServices/containers/blob/add/action"
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/delete",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/move/action",
+        "Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action"
       ],
       "AssignableScopes": ["/subscriptions/'$AZURE_SUBSCRIPTION_ID'"]
       }'
