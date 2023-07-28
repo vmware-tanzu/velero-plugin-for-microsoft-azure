@@ -286,10 +286,11 @@ There are two ways to specify the role: use the built-in role or create a custom
     AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
     AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
     AZURE_CLOUD_NAME=AzurePublicCloud
+    AZURE_ENVIRONMENT=AzurePublicCloud
     EOF
     ```
 
-    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
+    > Available values for `AZURE_CLOUD_NAME` and `AZURE_ENVIRONMENT`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`. `AZURE_ENVIRONMENT` is NOT required for `AzurePublicCloud`
 
 ### Option 2: Use Azure AD Workload Identity
 
@@ -393,10 +394,11 @@ Before proceeding, ensure that you have installed [workload identity mutating ad
     AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
     AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
     AZURE_CLOUD_NAME=AzurePublicCloud
+    AZURE_ENVIRONMENT=AzurePublicCloud
     EOF
     ```
 
-    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
+    > Available values for `AZURE_CLOUD_NAME` and `AZURE_ENVIRONMENT`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`. `AZURE_ENVIRONMENT` is NOT required for `AzurePublicCloud`
 
 
 ### Option 3: Use storage account access key
@@ -415,10 +417,11 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
     cat << EOF  > ./credentials-velero
     AZURE_STORAGE_ACCOUNT_ACCESS_KEY=${AZURE_STORAGE_ACCOUNT_ACCESS_KEY}
     AZURE_CLOUD_NAME=AzurePublicCloud
+    AZURE_ENVIRONMENT=AzurePublicCloud
     EOF
     ```
 
-    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
+    > Available values for `AZURE_CLOUD_NAME` and `AZURE_ENVIRONMENT`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`. `AZURE_ENVIRONMENT` is NOT required for `AzurePublicCloud`
 
 ## Install and start Velero
 
