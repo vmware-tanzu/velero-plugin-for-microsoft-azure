@@ -46,9 +46,10 @@ import (
 const (
 	resourceGroupEnvVar = "AZURE_RESOURCE_GROUP"
 
-	apiTimeoutConfigKey       = "apiTimeout"
-	snapsIncrementalConfigKey = "incremental"
-	snapsTagsConfigKey        = "tags"
+	apiTimeoutConfigKey                       = "apiTimeout"
+	snapsIncrementalConfigKey                 = "incremental"
+	snapsTagsConfigKey                        = "tags"
+	snapsActiveDirectoryAuthorityURIConfigKey = "activeDirectoryAuthorityURI"
 
 	snapshotsResource = "snapshots"
 	disksResource     = "disks"
@@ -125,6 +126,11 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	cloudConfig, err := cloudFromName(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
+	}
+
+	// Update active directory authority host if it is set in the configuration
+	if config[snapsActiveDirectoryAuthorityURIConfigKey] != "" {
+		cloudConfig.ActiveDirectoryAuthorityHost = config[snapsActiveDirectoryAuthorityURIConfigKey]
 	}
 
 	// if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
