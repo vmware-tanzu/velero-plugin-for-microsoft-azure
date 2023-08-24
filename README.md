@@ -19,7 +19,6 @@ Below is a listing of plugin versions and respective Velero versions that are co
 
 | Plugin Version | Velero Version |
 |----------------|----------------|
-| v1.8.x         | v1.12.x        |
 | v1.7.x         | v1.11.x        |
 | v1.6.x         | v1.10.x        |
 | v1.5.x         | v1.9.x         |
@@ -156,30 +155,30 @@ If you plan to use Velero to take Azure snapshots of your persistent volume mana
 If you don't plan to take Azure disk snapshots, any method is valid.
 
 ### Specify Role
-_**Note**: This is only required for (1) by using a Velero-specific service principal and  (2) by using Azure AD Workload Identity._
+_**Note**: This is only required for (1) by using a Velero-specific service principal and  (2) by using Azure AD Workload Identity._  
 
 1. Obtain your Azure Account Subscription ID:
    ```
    AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
    ```
 
-2. Specify the role
-There are two ways to specify the role: use the built-in role or create a custom one.
+2. Specify the role  
+There are two ways to specify the role: use the built-in role or create a custom one.  
    You can use the Azure built-in role `Contributor`:
    ```
    AZURE_ROLE=Contributor
    ```
    This will have subscription-wide access, so protect the credential generated with this role.
-
-   It is always best practice to assign the minimum required permissions necessary for an application to do its work.
-
+   
+   It is always best practice to assign the minimum required permissions necessary for an application to do its work.  
+   
    > Note: With useAAD flag you will need to provide extra permissions `Storage Blob Data Contributor` covered in point 3 of section: [Create service principal](#create-service-principal)
 
    Here are the minimum required permissions needed by Velero to perform backups, restores, and deletions:
    - Storage Account
       > Back Compatability and Restic
-      - Microsoft.Storage/storageAccounts/listkeys/action
-      - Microsoft.Storage/storageAccounts/regeneratekey/action
+      - Microsoft.Storage/storageAccounts/listkeys/action  
+      - Microsoft.Storage/storageAccounts/regeneratekey/action  
       > AAD Based Auth
       - Microsoft.Storage/storageAccounts/blobServices/containers/delete
       - Microsoft.Storage/storageAccounts/blobServices/containers/read
@@ -202,7 +201,7 @@ There are two ways to specify the role: use the built-in role or create a custom
       - Microsoft.Compute/snapshots/delete
       - Microsoft.Compute/disks/beginGetAccess/action
       - Microsoft.Compute/disks/endGetAccess/action
-
+   
    Use the following commands to create a custom role which has the minimum required permissions:
    ```
    AZURE_ROLE=Velero
@@ -311,7 +310,7 @@ Before proceeding, ensure that you have installed [workload identity mutating ad
 
     IDENTITY_CLIENT_ID="$(az identity show -g $AZURE_RESOURCE_GROUP -n $IDENTITY_NAME --subscription $AZURE_SUBSCRIPTION_ID --query clientId -otsv)"
     ```
-
+    
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique identity name per cluster rather than the default `velero`.
 
 2. Assign the identity roles:
@@ -366,11 +365,11 @@ Before proceeding, ensure that you have installed [workload identity mutating ad
     ```
 
 4. Get the cluster OIDC issuer URL
-
+    
     ```bash
-    CLUSTER_RESOURCE_GROUP=<NAME_OF_CLUSTER_RESOURCE_GROUP>
+    CLUSTER_RESOURCE_GROUP=<NAME_OF_CLUSTER_RESOURCE_GROUP>  
     ```
-    **WARNING**: If you're using [AKS][25], `CLUSTER_RESOURCE_GROUP` must be set to the name of the resource group where the cluster is created, not the auto-generated resource group that is created when you provision your cluster in Azure.
+    **WARNING**: If you're using [AKS][25], `CLUSTER_RESOURCE_GROUP` must be set to the name of the resource group where the cluster is created, not the auto-generated resource group that is created when you provision your cluster in Azure.  
 
     ```bash
     CLUSTER_NAME=your_cluster_name
@@ -569,11 +568,6 @@ velero backup-location create <bsl-name> \
   --credential=bsl-credentials=azure
 ```
 
-If you would like to customize the Storage Location and or the AAD URI associated with the backup location add the following to the `--config` argument:
-```bash
---config storageAccountURI=my-sa.blob.core.windows.net,activeDirectoryAuthorityURI='https://login.microsoftonline.us/'
-```
-
 The Backup Storage Location is ready to use when it has the phase `Available`.
 You can check this with the following command:
 
@@ -614,4 +608,4 @@ To improve security within Azure, it's good practice [to disable public traffic 
 [29]: https://learn.microsoft.com/en-us/azure/aks/use-oidc-issuer#create-an-aks-cluster-with-oidc-issuer
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"
-[103]: https://github.com/vmware-tanzu/velero/issues/new/choose
+[103]: https://github.com/vmware-tanzu/velero/issues/new/choose 

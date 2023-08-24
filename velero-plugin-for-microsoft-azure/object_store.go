@@ -46,12 +46,11 @@ import (
 )
 
 const (
-	storageAccountConfigKey              = "storageAccount"
-	storageAccountKeyEnvVarConfigKey     = "storageAccountKeyEnvVar"
-	blockSizeConfigKey                   = "blockSizeInBytes"
-	storageAccountURIConfigKey           = "storageAccountURI"
-	useAADConfigKey                      = "useAAD"
-	activeDirectoryAuthorityURIConfigKey = "activeDirectoryAuthorityURI"
+	storageAccountConfigKey          = "storageAccount"
+	storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
+	blockSizeConfigKey               = "blockSizeInBytes"
+	storageAccountURIConfigKey       = "storageAccountURI"
+	useAADConfigKey                  = "useAAD"
 
 	// blocks must be less than/equal to 100MB in size
 	// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
@@ -335,7 +334,6 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		blockSizeConfigKey,
 		storageAccountURIConfigKey,
 		useAADConfigKey,
-		activeDirectoryAuthorityURIConfigKey,
 		storageAccountKeyEnvVarConfigKey,
 		credentialsFileConfigKey,
 	); err != nil {
@@ -356,11 +354,6 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	cloudConfig, err := cloudFromName(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
-	}
-
-	// Update active directory authority host if it is set in the configuration
-	if config[activeDirectoryAuthorityURIConfigKey] != "" && config[useAADConfigKey] == "true" {
-		cloudConfig.ActiveDirectoryAuthorityHost = config[activeDirectoryAuthorityURIConfigKey]
 	}
 
 	o.log.Debugf("Getting storage key")

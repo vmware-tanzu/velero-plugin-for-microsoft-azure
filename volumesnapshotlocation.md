@@ -32,13 +32,6 @@ spec:
     # Optional.
     subscriptionId: alt-subscription
 
-    # URI of the AAD endpoint of the volume snapshots account.
-    #
-    # Note that the fully qualified AAD URI with http(s):// scheme is required to authenticate
-    #
-    # Optional. This will ensure that velero uses the provided AAD URI to authenticate to the volume snapshots account.
-    activeDirectoryAuthorityURI: https://login.microsoftonline.us/
-
     # Azure offers the option to take full or incremental snapshots of managed disks.
     # - Set this parameter to true, to take incremental snapshots.
     # - If the parameter is omitted or set to false, full snapshots are taken (default).
