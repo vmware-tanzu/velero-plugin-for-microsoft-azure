@@ -86,6 +86,18 @@ func TestE2E(t *testing.T) {
 			},
 		},
 		{
+			scenario: "AAD and SA URI is provided - getProperties is not called, custom AAD is used",
+			config: map[string]string{
+				storageAccountConfigKey:          		"velerotest",
+				storageAccountKeyEnvVarConfigKey: 		"AZ_STORAGE_KEY",
+				resourceGroupConfigKey:           		"saRgName",
+				subscriptionIDConfigKey:          		"81d18ba6-71e1-4858-a4a4-4c527ccdd4d6",
+				storageAccountURIConfigKey:           	"https://velerotest.blob.core.windows.net/",
+				useAADConfigKey:                  	  	"true",
+				activeDirectoryAuthorityURIConfigKey: 	"https://core.windows.net"
+			},
+		},
+		{
 			scenario: "GetProperties + ListKeys - AAD enabled",
 			config: map[string]string{
 				storageAccountConfigKey:          "velerotest",
