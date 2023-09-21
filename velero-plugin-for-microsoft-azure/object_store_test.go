@@ -21,10 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
-	azcontainer "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -139,27 +137,4 @@ func (m *mockBlob) Delete(options *azblob.DeleteBlobOptions) error {
 func (m *mockBlob) GetSASURI(ttl time.Duration, sharedKeyCredential *azblob.SharedKeyCredential) (string, error) {
 	args := m.Called(ttl, sharedKeyCredential)
 	return args.String(0), args.Error(1)
-}
-
-type mockContainerGetter struct {
-	mock.Mock
-}
-
-func (m *mockContainerGetter) getContainer(bucket string) (container, error) {
-	args := m.Called(bucket)
-	return args.Get(0).(container), args.Error(1)
-}
-
-type mockContainer struct {
-	mock.Mock
-}
-
-func (m *mockContainer) ListBlobs(params *azcontainer.ListBlobsFlatOptions) *runtime.Pager[azcontainer.ListBlobsFlatResponse] {
-	args := m.Called(params)
-	return args.Get(0).(*runtime.Pager[azcontainer.ListBlobsFlatResponse])
-}
-
-func (m *mockContainer) ListBlobsHierarchy(delimiter string, listOptions *azcontainer.ListBlobsHierarchyOptions) *runtime.Pager[azcontainer.ListBlobsHierarchyResponse] {
-	args := m.Called(delimiter, listOptions)
-	return args.Get(0).(*runtime.Pager[azcontainer.ListBlobsHierarchyResponse])
 }
