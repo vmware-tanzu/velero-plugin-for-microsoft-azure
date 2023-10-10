@@ -24,6 +24,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -137,4 +138,32 @@ func (m *mockBlob) Delete(options *azblob.DeleteBlobOptions) error {
 func (m *mockBlob) GetSASURI(ttl time.Duration, sharedKeyCredential *azblob.SharedKeyCredential) (string, error) {
 	args := m.Called(ttl, sharedKeyCredential)
 	return args.String(0), args.Error(1)
+}
+
+func TestGetBlockSize(t *testing.T) {
+	logger := logrus.New()
+	config := map[string]string{}
+	// not specified
+	size := getBlockSize(logger, config)
+	assert.Equal(t, defaultBlockSize, size)
+
+	// invalid value specified
+	config[blockSizeConfigKey] = "invalid"
+	size = getBlockSize(logger, config)
+	assert.Equal(t, defaultBlockSize, size)
+
+	// value < 0 specified
+	config[blockSizeConfigKey] = "0"
+	size = getBlockSize(logger, config)
+	assert.Equal(t, defaultBlockSize, size)
+
+	// value > max size specified
+	config[blockSizeConfigKey] = "1048576000"
+	size = getBlockSize(logger, config)
+	assert.Equal(t, maxBlockSize, size)
+
+	// valid value specified
+	config[blockSizeConfigKey] = "1048570"
+	size = getBlockSize(logger, config)
+	assert.Equal(t, 1048570, size)
 }
