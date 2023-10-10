@@ -70,6 +70,6 @@ spec:
     # See https://docs.microsoft.com/en-us/rest/api/storageservices/understanding-block-blobs--append-blobs--and-page-blobs#about-block-blobs
     # for more information on block blobs.
     #
-    # Optional (defaults to 104857600, i.e. 100MB).
-    blockSizeInBytes: "104857600"
+    # Optional (defaults to 1048576, i.e. 1MB, maximum 104857600, i.e. 100MB).
+    blockSizeInBytes: "1048576"
 ```
