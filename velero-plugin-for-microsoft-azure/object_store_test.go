@@ -26,6 +26,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	azcontainer "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -162,4 +163,32 @@ func (m *mockContainer) ListBlobs(params *azcontainer.ListBlobsFlatOptions) *run
 func (m *mockContainer) ListBlobsHierarchy(delimiter string, listOptions *azcontainer.ListBlobsHierarchyOptions) *runtime.Pager[azcontainer.ListBlobsHierarchyResponse] {
 	args := m.Called(delimiter, listOptions)
 	return args.Get(0).(*runtime.Pager[azcontainer.ListBlobsHierarchyResponse])
+}
+
+func TestGetBlockSize(t *testing.T) {
+	logger := logrus.New()
+	config := map[string]string{}
+	// not specified
+	size := getBlockSize(logger, config)
+	assert.Equal(t, defaultBlockSize, size)
+
+	// invalid value specified
+	config[blockSizeConfigKey] = "invalid"
+	size = getBlockSize(logger, config)
+	assert.Equal(t, defaultBlockSize, size)
+
+	// value < 0 specified
+	config[blockSizeConfigKey] = "0"
+	size = getBlockSize(logger, config)
+	assert.Equal(t, defaultBlockSize, size)
+
+	// value > max size specified
+	config[blockSizeConfigKey] = "1048576000"
+	size = getBlockSize(logger, config)
+	assert.Equal(t, maxBlockSize, size)
+
+	// valid value specified
+	config[blockSizeConfigKey] = "1048570"
+	size = getBlockSize(logger, config)
+	assert.Equal(t, 1048570, size)
 }

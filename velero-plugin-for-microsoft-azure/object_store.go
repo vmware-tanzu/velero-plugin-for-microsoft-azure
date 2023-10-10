@@ -55,7 +55,8 @@ const (
 
 	// blocks must be less than/equal to 100MB in size
 	// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
-	defaultBlockSize = 100 * 1024 * 1024
+	maxBlockSize     = 100 * 1024 * 1024
+	defaultBlockSize = 1 * 1024 * 1024
 )
 
 type containerGetter interface {
@@ -412,9 +413,14 @@ func getBlockSize(log logrus.FieldLogger, config map[string]string) int {
 		return defaultBlockSize
 	}
 
-	if blockSize <= 0 || blockSize > defaultBlockSize {
-		log.WithError(err).Warnf("Value provided for config.blockSizeInBytes (%d) is outside the allowed range of 1 to %d, using default block size of %d", blockSize, defaultBlockSize, defaultBlockSize)
+	if blockSize <= 0 {
+		log.WithError(err).Warnf("Value provided for config.blockSizeInBytes (%d) is < 1, using default block size of %d", blockSize, defaultBlockSize)
 		return defaultBlockSize
+	}
+
+	if blockSize > maxBlockSize {
+		log.WithError(err).Warnf("Value provided for config.blockSizeInBytes (%d) is > the max size %d, using max block size of %d", blockSize, maxBlockSize, maxBlockSize)
+		return maxBlockSize
 	}
 
 	return blockSize
