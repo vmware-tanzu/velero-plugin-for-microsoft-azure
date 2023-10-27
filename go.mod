@@ -6,7 +6,7 @@ toolchain go1.21.3
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.7.1
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute v1.0.0
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v4 v4.2.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.1.0
 	github.com/gofrs/uuid v4.3.1+incompatible
 	github.com/pkg/errors v0.9.1
