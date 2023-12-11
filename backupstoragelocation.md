@@ -51,7 +51,7 @@ spec:
     # Optional. This will ensure that velero uses the provided URI to communicate to the Storage Account,
     # and it will not try to fetch the Endpoint by making an ARM call.
     # If this field is provided then resourceGroup, subscriptionId can be left empty
-    storageAccountURI: my-sa.blob.core.windows.net
+    storageAccountURI: https://my-sa.blob.core.windows.net
 
     # Boolean parameter to decide whether to use AAD for authenticating with the storage account.
     # If false/ not provided, plugin will fallback to using ListKeys

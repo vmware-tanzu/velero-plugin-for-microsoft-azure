@@ -466,7 +466,7 @@ velero install \
     --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config storageAccountURI="xxxxxx.blob.core.windows.net",useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --backup-location-config storageAccountURI="https://xxxxxx.blob.core.windows.net",useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
@@ -568,7 +568,7 @@ velero backup-location create <bsl-name> \
 
 If you would like to customize the Storage Location and or the AAD URI associated with the backup location add the following to the `--config` argument:
 ```bash
---config storageAccountURI=my-sa.blob.core.windows.net,activeDirectoryAuthorityURI='https://login.microsoftonline.us/'
+--config storageAccountURI='https://my-sa.blob.core.windows.net',activeDirectoryAuthorityURI='https://login.microsoftonline.us/'
 ```
 
 The Backup Storage Location is ready to use when it has the phase `Available`.
