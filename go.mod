@@ -13,7 +13,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
-	github.com/vmware-tanzu/velero v1.10.0-rc.1.0.20231016041753-7ca33f8f128a
+	github.com/vmware-tanzu/velero v1.10.0-rc.1.0.20231212044725-5f14628d696e
 	k8s.io/api v0.26.0
 	k8s.io/apimachinery v0.26.0
 	sigs.k8s.io/azuredisk-csi-driver v1.26.0
@@ -72,7 +72,7 @@ require (
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/grpc v1.57.1 // indirect
+	google.golang.org/grpc v1.58.3 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
