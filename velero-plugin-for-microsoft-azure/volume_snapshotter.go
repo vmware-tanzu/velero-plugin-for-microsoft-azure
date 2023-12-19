@@ -89,7 +89,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	if err := veleroplugin.ValidateVolumeSnapshotterConfigKeys(config,
 		vslConfigKeyResourceGroup,
 		vslConfigKeyAPITimeout,
-		vslConfigKeyResourceGroup,
+		vslConfigKeySubscriptionID,
 		vslConfigKeyIncremental,
 		vslConfigKeyTags,
 		credentialsFileConfigKey,
