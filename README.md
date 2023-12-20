@@ -19,6 +19,7 @@ Below is a listing of plugin versions and respective Velero versions that are co
 
 | Plugin Version | Velero Version |
 |----------------|----------------|
+| v1.9.x         | v1.13.x        |
 | v1.8.x         | v1.12.x        |
 | v1.7.x         | v1.11.x        |
 | v1.6.x         | v1.10.x        |
@@ -432,7 +433,7 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.9.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
@@ -446,7 +447,7 @@ velero install \
     --provider azure \
     --service-account-name velero \
     --pod-labels azure.workload.identity/use=true \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.9.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
@@ -463,7 +464,7 @@ You can chose to provide the Storage Account's blob endpoint directly to Velero.
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.9.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config storageAccountURI="https://xxxxxx.blob.core.windows.net",useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
@@ -495,7 +496,7 @@ Limitation: Listing storage account access key is still needed for Restic to wor
 ```bash
 velero install \
     --provider azure \
-    --plugins velero/velero-plugin-for-microsoft-azure:v1.8.0 \
+    --plugins velero/velero-plugin-for-microsoft-azure:v1.9.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
