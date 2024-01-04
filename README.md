@@ -179,9 +179,11 @@ There are two ways to specify the role: use the built-in role or create a custom
    Here are the minimum required permissions needed by Velero to perform backups, restores, and deletions:
    - Storage Account
       > Back Compatability and Restic
+      - Microsoft.Storage/storageAccounts/read
       - Microsoft.Storage/storageAccounts/listkeys/action
       - Microsoft.Storage/storageAccounts/regeneratekey/action
       > AAD Based Auth
+      - Microsoft.Storage/storageAccounts/read
       - Microsoft.Storage/storageAccounts/blobServices/containers/delete
       - Microsoft.Storage/storageAccounts/blobServices/containers/read
       - Microsoft.Storage/storageAccounts/blobServices/containers/write
@@ -220,6 +222,7 @@ There are two ways to specify the role: use the built-in role or create a custom
           "Microsoft.Compute/snapshots/delete",
           "Microsoft.Storage/storageAccounts/listkeys/action",
           "Microsoft.Storage/storageAccounts/regeneratekey/action",
+          "Microsoft.Storage/storageAccounts/read",
           "Microsoft.Storage/storageAccounts/blobServices/containers/delete",
           "Microsoft.Storage/storageAccounts/blobServices/containers/read",
           "Microsoft.Storage/storageAccounts/blobServices/containers/write",
