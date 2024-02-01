@@ -588,6 +588,15 @@ To use this new Backup Storage Location when performing a backup, use the flag `
 
 To improve security within Azure, it's good practice [to disable public traffic to your Azure Storage Account][26]. If your AKS cluster is in the same Azure Region as your storage account, access to your Azure Storage Account should be easily enabled by a [Virtual Network endpoint][27] on your VNet.
 
+## Tips
+We recommend taking incremental snapshots of Azure Disks since they are more cost efficient and come with the following benefits (Read more: [Azure Docs][30]):
+
+> Incremental snapshots are point-in-time backups for managed disks that, when taken, consist only of the changes since the last snapshot. The first incremental snapshot is a full copy of the disk. The subsequent incremental snapshots occupy only delta changes to disks since the last snapshot. When you restore a disk from an incremental snapshot, the system reconstructs the full disk that represents the point in time backup of the disk when the incremental snapshot was taken.
+
+> If ZRS is available in the selected region, an incremental snapshot will use ZRS automatically. If ZRS isn't available in the region, then the snapshot will default to locally-redundant storage (LRS)
+
+**To enable Incremental snapshots, set `incremental` to `true` as part of `--snapshot-location-config`. Refer [additional configurable parameters][8] for the `--snapshot-location-config` flag.**
+
 [1]: #Create-Azure-storage-account-and-blob-container
 [2]: #Set-permissions-for-Velero
 [3]: #Install-and-start-Velero
@@ -613,6 +622,7 @@ To improve security within Azure, it's good practice [to disable public traffic 
 [27]: https://docs.microsoft.com/en-us/azure/virtual-network/virtual-network-service-endpoints-overview
 [28]: https://azure.github.io/azure-workload-identity/docs/installation/mutating-admission-webhook.html
 [29]: https://learn.microsoft.com/en-us/azure/aks/use-oidc-issuer#create-an-aks-cluster-with-oidc-issuer
+[30]: https://learn.microsoft.com/en-us/azure/virtual-machines/disks-incremental-snapshots
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"
 [103]: https://github.com/vmware-tanzu/velero/issues/new/choose
