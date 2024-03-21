@@ -150,14 +150,14 @@ of your cluster's resources before continuing._
 
 ## Set permissions for Velero
 
-There are several ways Velero can authenticate to Azure: (1) by using a Velero-specific [service principal][20]; (2) by using [Azure AD Workload Identity][23]; or (3) by using a storage account access key.
+There are several ways Velero can authenticate to Azure: (1) by using a Velero-specific [service principal][20] with secret-based authentication; (2) by using a Velero-specific [service principal][20] with certificate-based authentication; (3) by using [Azure AD Workload Identity][23]; or (4) by using a storage account access key.
 
 If you plan to use Velero to take Azure snapshots of your persistent volume managed disks, you **must** use the service principal or Azure AD Workload Identity method.
 
 If you don't plan to take Azure disk snapshots, any method is valid.
 
 ### Specify Role
-_**Note**: This is only required for (1) by using a Velero-specific service principal and  (2) by using Azure AD Workload Identity._
+_**Note**: This is only required for (1) by using a Velero-specific service principal with secret-based authentication, (2) by using a Velero-specific service principal with certificate-based authentication and (3) by using Azure AD Workload Identity._
 
 1. Obtain your Azure Account Subscription ID:
    ```
@@ -241,7 +241,7 @@ There are two ways to specify the role: use the built-in role or create a custom
    _(Optional) If you are using a different Subscription for backups and cluster resources, make sure to specify both subscriptions
    inside `AssignableScopes`._
 
-### Option 1: Create service principal
+### Option 1: Create service principal with secret-based authentication
 
 1. Obtain your Azure Account Tenant ID:
 
@@ -249,7 +249,7 @@ There are two ways to specify the role: use the built-in role or create a custom
     AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
     ```
 
-2. Create a service principal.
+2. Create a service principal with secet-based authentication.
 
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
@@ -296,7 +296,62 @@ There are two ways to specify the role: use the built-in role or create a custom
 
     > Available values for `AZURE_CLOUD_NAME`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
-### Option 2: Use Azure AD Workload Identity
+### Option 2: Create service principal with certificate-based authentication
+
+1. Obtain your Azure Account Tenant ID:
+
+    ```bash
+    AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
+    ```
+
+2. Create a service principal with certificate-based authentication.
+
+    If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique username per cluster rather than the default `velero`.
+
+    Create service principal and let the CLI creates a self-signed certificate for you. Make sure to capture the certificate.
+
+    _(Optional) If you are using a different Subscription for backups and cluster resources, make sure to specify both subscriptions
+    in the `az` command using `--scopes`._
+
+    ```bash
+    AZURE_CLIENT_CERTIFICATE_PATH=`az ad sp create-for-rbac --name "velero" --role $AZURE_ROLE --query 'fileWithCertAndPrivateKey' -o tsv \
+      --scopes  /subscriptions/$AZURE_SUBSCRIPTION_ID[ /subscriptions/$AZURE_BACKUP_SUBSCRIPTION_ID] --create-cert`
+    ```
+
+    NOTE: Ensure that value for `--name` does not conflict with other service principals/app registrations.
+
+    After creating the service principal, obtain the client id.
+
+    ```bash
+    AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
+    ```
+3. (Optional)Assign additional permissions to the service principal (For useAAD=true with built-in role)
+
+    If you use the custom role which has the blob data permissions, skip this step.
+
+    If you chose the AAD route, this is an additional permissions required for the service principal to be able to access the storage account.
+    ```bash
+    az role assignment create --assignee $AZURE_CLIENT_ID --role "Storage Blob Data Contributor" --scope /subscriptions/$AZURE_SUBSCRIPTION_ID
+    ```
+
+    Refer: [useAAD parameter in BackupStorageLocation.md](./backupstoragelocation.md#backup-storage-location)
+
+6. Now you need to create a file that contains all the relevant environment variables. The command looks like the following:
+
+    ```bash
+    cat << EOF  > ./credentials-velero
+    AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+    AZURE_TENANT_ID=${AZURE_TENANT_ID}
+    AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+    AZURE_CLIENT_CERTIFICATE=$(awk 'BEGIN {printf "\""} {sub(/\r/, ""); printf "%s\\n",$0;} END {printf "\""}' $AZURE_CLIENT_CERTIFICATE_PATH)
+    AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+    AZURE_CLOUD_NAME=AzurePublicCloud
+    EOF
+    ```
+
+    > Available values for `AZURE_CLOUD_NAME`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
+
+### Option 3: Use Azure AD Workload Identity
 
 These instructions have been adapted from the [Azure AD Workload Identity Quick Start][24] documentation.
 
@@ -404,7 +459,7 @@ Before proceeding, ensure that you have installed [workload identity mutating ad
     > Available values for `AZURE_CLOUD_NAME`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
 
-### Option 3: Use storage account access key
+### Option 4: Use storage account access key
 
 _Note: this option is **not valid** if you are planning to take Azure snapshots of your managed disks with Velero._
 
