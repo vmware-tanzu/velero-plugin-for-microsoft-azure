@@ -345,10 +345,13 @@ There are two ways to specify the role: use the built-in role or create a custom
     AZURE_CLIENT_CERTIFICATE=$(awk 'BEGIN {printf "\""} {sub(/\r/, ""); printf "%s\\n",$0;} END {printf "\""}' $AZURE_CLIENT_CERTIFICATE_PATH)
     AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
     AZURE_CLOUD_NAME=AzurePublicCloud
+    AZURE_CLIENT_SEND_CERTIFICATE_CHAIN=true
     EOF
     ```
 
     > Available values for `AZURE_CLOUD_NAME`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
+    
+    > You must set `AZURE_CLIENT_SEND_CERTIFICATE_CHAIN=true` for SNI based authentication
 
 ### Option 3: Use Azure AD Workload Identity
 
