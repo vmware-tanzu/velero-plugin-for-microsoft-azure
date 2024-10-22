@@ -87,6 +87,7 @@ func newVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	if err := veleroplugin.ValidateVolumeSnapshotterConfigKeys(config,
+		vslConfigKeyActiveDirectoryAuthorityURI,
 		vslConfigKeyResourceGroup,
 		vslConfigKeyAPITimeout,
 		vslConfigKeySubscriptionID,
