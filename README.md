@@ -493,7 +493,7 @@ velero install \
     --plugins velero/velero-plugin-for-microsoft-azure:v1.11.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --backup-location-config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_NAME[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
@@ -507,7 +507,7 @@ velero install \
     --plugins velero/velero-plugin-for-microsoft-azure:v1.11.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --backup-location-config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_NAME[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
@@ -524,7 +524,7 @@ velero install \
     --plugins velero/velero-plugin-for-microsoft-azure:v1.11.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config storageAccountURI="https://xxxxxx.blob.core.windows.net",useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --backup-location-config storageAccountURI="https://xxxxxx.blob.core.windows.net",useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_NAME[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
@@ -543,7 +543,7 @@ az role assignment create --role "Storage Blob Data Contributor" --assignee $IDE
 After that update your velero BackupStorageLocation with the useAAD flag as shown below:
 
 ```bash
-velero backup-location set default --provider azure --bucket $BLOB_CONTAINER --config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
+velero backup-location set default --provider azure --bucket $BLOB_CONTAINER --config useAAD="true",resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_NAME[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
 Limitation: Listing storage account access key is still needed for Restic to work as expected on Azure. The useAAD route won't accrue to it and users using Restic should not remove the ListKeys permission from the velero identity.
@@ -556,7 +556,7 @@ velero install \
     --plugins velero/velero-plugin-for-microsoft-azure:v1.11.0 \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_NAME,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --use-volume-snapshots=false
 ```
 
@@ -610,7 +610,7 @@ If you are using a service principal, create the Backup Storage Location as foll
 velero backup-location create <bsl-name> \
   --provider azure \
   --bucket $BLOB_CONTAINER \
-  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_NAME[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
   --credential=bsl-credentials=azure
 ```
 
@@ -620,7 +620,7 @@ Otherwise, use the following command if you are using a storage account access k
 velero backup-location create <bsl-name> \
   --provider azure \
   --bucket $BLOB_CONTAINER \
-  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
+  --config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_NAME,storageAccountKeyEnvVar=AZURE_STORAGE_ACCOUNT_ACCESS_KEY[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
   --credential=bsl-credentials=azure
 ```
 
