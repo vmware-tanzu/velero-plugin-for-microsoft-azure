@@ -1,6 +1,6 @@
 module github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
 
-go 1.22.8
+go 1.22.10
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.11.1
@@ -11,7 +11,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
-	github.com/vmware-tanzu/velero v1.15.0
+	github.com/vmware-tanzu/velero v1.15.1-rc.1
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
 	sigs.k8s.io/azuredisk-csi-driver v1.26.0
