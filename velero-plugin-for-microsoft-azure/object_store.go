@@ -231,7 +231,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		return err
 	}
 
-	client, cred, err := azure.NewStorageClient(o.log, config)
+	client, cred, err := NewStorageClient(o.log, config)
 	if err != nil {
 		return err
 	}
