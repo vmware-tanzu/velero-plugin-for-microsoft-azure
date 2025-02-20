@@ -50,4 +50,9 @@ spec:
     #
     # Optional.
     tags: key1=value1,key2=value2
+
+    # APIVersion to use with Azure client API calls for storage.
+    #
+    # Optional.
+    apiVersion: ""
 ```

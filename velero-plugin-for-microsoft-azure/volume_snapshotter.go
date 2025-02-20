@@ -39,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/azuredisk-csi-driver/pkg/util"
+
+	azutil "github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/velero-plugin-for-microsoft-azure/util"
 )
 
 const (
@@ -93,6 +95,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		vslConfigKeyIncremental,
 		vslConfigKeyTags,
 		credentialsFileConfigKey,
+		azutil.ApiVersion,
 	); err != nil {
 		return err
 	}
@@ -136,7 +139,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		}
 	}
 
-	clientOptions, err := azure.GetClientOptions(config, creds)
+	clientOptions, err := azutil.GetClientOptions(config, creds)
 	if err != nil {
 		return err
 	}

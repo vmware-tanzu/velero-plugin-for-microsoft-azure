@@ -35,6 +35,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/velero-plugin-for-microsoft-azure/util"
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/util/azure"
 )
@@ -227,11 +228,12 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		azure.BSLConfigUseAAD,
 		azure.BSLConfigStorageAccountAccessKeyName,
 		credentialsFileConfigKey,
+		util.ApiVersion,
 	); err != nil {
 		return err
 	}
 
-	client, cred, err := NewStorageClient(o.log, config)
+	client, cred, err := util.NewStorageClient(o.log, config)
 	if err != nil {
 		return err
 	}
