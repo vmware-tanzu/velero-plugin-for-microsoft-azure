@@ -2,7 +2,7 @@ module github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
 
 go 1.23.0
 
-toolchain go1.23.8
+toolchain go1.23.11
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.17.0
