@@ -11,7 +11,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.10.0
-	github.com/vmware-tanzu/velero v0.0.0-20250826085519-79b027577e6a
+	github.com/vmware-tanzu/velero v1.17.0-rc.1
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
 	sigs.k8s.io/azuredisk-csi-driver v1.26.0
