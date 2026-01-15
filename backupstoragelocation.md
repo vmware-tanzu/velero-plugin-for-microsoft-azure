@@ -72,9 +72,4 @@ spec:
     #
     # Optional (defaults to 1048576, i.e. 1MB, maximum 104857600, i.e. 100MB).
     blockSizeInBytes: "1048576"
-
-    # APIVersion of the Azure storage account blob service.
-
-    # Optional. This can be used in environments where the supported API versions do not match the default azure client version.
-    apiVersion: ""
 ```

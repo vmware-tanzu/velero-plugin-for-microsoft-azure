@@ -50,9 +50,4 @@ spec:
     #
     # Optional.
     tags: key1=value1,key2=value2
-
-    # APIVersion of the Azure managed disk service.
-
-    # Optional. This can be used in environments where the supported API versions do not match the default azure client version.
-    apiVersion: ""
 ```
