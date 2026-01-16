@@ -50,4 +50,16 @@ spec:
     #
     # Optional.
     tags: key1=value1,key2=value2
+  
+    # APIVersion to use with azure disk API requests.
+    #
+    # Optional. This is used for private cloud environments which may not have the same available api versions as
+    # the public cloud
+    diskApiVersion: ""
+
+    # APIVersion to use with azure snapshot API requests.
+    #
+    # Optional. This is used for private cloud environments which may not have the same available api version as
+    # the public cloud
+    snapshotApiVersion: ""
 ```

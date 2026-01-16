@@ -72,4 +72,10 @@ spec:
     #
     # Optional (defaults to 1048576, i.e. 1MB, maximum 104857600, i.e. 100MB).
     blockSizeInBytes: "1048576"
+
+    # APIVersion to use with blob storage API requests.
+    #
+    # Optional. This is used for private cloud environments which may not have the same available api versions as
+    # the public cloud
+    apiVersion: ""
 ```

@@ -481,7 +481,10 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
 
 ### Using Azure Custom or Stack clouds
 
-When using custom Azure clouds, there are two methods to configure velero. For potential APIVersion conflicts between the internal azure go SDK versions and the versions of AzureStack or custom clouds, both `BackupStorageLocation` and `VolumeSnapshotLocation` config support an `apiVersion` parameter to pin requests to a specific APIVersion for service api calls.
+When using custom Azure clouds, there are two methods to configure velero. For potential APIVersion conflicts between the internal azure go SDK versions and the versions of AzureStack or custom clouds, both `BackupStorageLocation` and `VolumeSnapshotLocation` config provide relevate `apiVersion` configurations to pin requests. You can us the following commands to see available API versions in your cloud environment:
+
+  ```bash
+  ```
 
 #### Option 1: Use Azure ResourceManager endpoint discovery
 
