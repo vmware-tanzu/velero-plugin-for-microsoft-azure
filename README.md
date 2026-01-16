@@ -479,6 +479,34 @@ _Note: this option is **not valid** if you are planning to take Azure snapshots 
 
     > Available values for `AZURE_CLOUD_NAME`: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`
 
+### Using Azure Custom or Stack clouds
+
+When using custom Azure clouds, there are two methods to configure velero. For potential APIVersion conflicts between the internal azure go SDK versions and the versions of AzureStack or custom clouds, both `BackupStorageLocation` and `VolumeSnapshotLocation` config provide relevate `apiVersion` configurations to pin requests. You can us the following commands to see available API versions in your cloud environment:
+
+  ```bash
+  ```
+
+#### Option 1: Use Azure ResourceManager endpoint discovery
+
+  ```bash
+  cat << EOF > ./credentials-velero
+  AZURE_CLOUD_NAME=AzureCustomCloud
+  AZURE_RESOURCE_MANAGER_ENDPOINT=<Azure resource manager endpoint. For example, https://management.usgovcloudapi.net>
+  EOF
+  ```
+
+#### Option 2: Use Azure cloud configuration
+
+1. Ensure that a valid [cloud provider configuration](https://cloud-provider-azure.sigs.k8s.io/install/configs/) has been created. If using AKS, this can be mounted from the host path `/etc/kubernetes/azurestackcloud.json`
+2. Ensure that the environment variable `AZURE_ENVIRONMENT_FILEPATH` has been set to the location of the file from step 1
+3. Set the configuration (cloud name **must** be `AzureStackCloud`)
+
+  ```bash
+  cat << EOF > ./credentials-velero
+  AZURE_CLOUD_NAME=AzureStackCloud
+  EOF
+  ```
+
 ## Install and start Velero
 
 [Download][6] Velero
