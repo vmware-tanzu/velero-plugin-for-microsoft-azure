@@ -127,4 +127,4 @@ replace (
 )
 
 // XXX
-replace github.com/vmware-tanzu/velero => ../velero
+replace github.com/vmware-tanzu/velero => github.com/schaafito/velero v0.0.0-20260116035654-1f57a86de8cb
