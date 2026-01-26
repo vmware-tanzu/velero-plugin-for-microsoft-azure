@@ -227,6 +227,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		azure.BSLConfigUseAAD,
 		azure.BSLConfigStorageAccountAccessKeyName,
 		credentialsFileConfigKey,
+		azure.BSLConfigApiVersion,
 	); err != nil {
 		return err
 	}

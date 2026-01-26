@@ -50,6 +50,8 @@ const (
 	vslConfigKeyAPITimeout                  = "apiTimeout"
 	vslConfigKeyIncremental                 = "incremental"
 	vslConfigKeyTags                        = "tags"
+	vslConfigKeyDiskApiVersion              = "diskApiVersion"
+	vslConfigKeySnapshotApiVersion          = "snapshotApiVersion"
 
 	snapshotsResource = "snapshots"
 	disksResource     = "disks"
@@ -92,6 +94,8 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		vslConfigKeySubscriptionID,
 		vslConfigKeyIncremental,
 		vslConfigKeyTags,
+		vslConfigKeyDiskApiVersion,
+		vslConfigKeySnapshotApiVersion,
 		credentialsFileConfigKey,
 	); err != nil {
 		return err
@@ -145,12 +149,16 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		return err
 	}
 
-	b.disks, err = armcompute.NewDisksClient(b.disksSubscription, credential, &arm.ClientOptions{ClientOptions: clientOptions})
+	b.disks, err = armcompute.NewDisksClient(b.disksSubscription, credential, &arm.ClientOptions{
+		ClientOptions: azure.SetApiVersionPolicy(config[vslConfigKeyDiskApiVersion], clientOptions),
+	})
 	if err != nil {
 		return errors.Wrap(err, "error creating disk client")
 	}
 
-	b.snaps, err = armcompute.NewSnapshotsClient(b.snapsSubscription, credential, &arm.ClientOptions{ClientOptions: clientOptions})
+	b.snaps, err = armcompute.NewSnapshotsClient(b.snapsSubscription, credential, &arm.ClientOptions{
+		ClientOptions: azure.SetApiVersionPolicy(config[vslConfigKeySnapshotApiVersion], clientOptions),
+	})
 	if err != nil {
 		return errors.Wrap(err, "error creating snapshot client")
 	}
