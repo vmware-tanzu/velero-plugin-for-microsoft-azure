@@ -18,6 +18,7 @@ package main
 
 import (
 	"io"
+	"os"
 	"testing"
 	"time"
 
@@ -166,4 +167,122 @@ func TestGetBlockSize(t *testing.T) {
 	config[blockSizeConfigKey] = "1048570"
 	size = getBlockSize(logger, config)
 	assert.Equal(t, 1048570, size)
+}
+
+func TestInitWithSASToken_MissingStorageAccount(t *testing.T) {
+	o := &ObjectStore{log: logrus.New()}
+	err := o.initWithSASToken(map[string]string{}, "MY_SAS_TOKEN_ENV")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "storageAccount is required")
+}
+
+func TestInitWithSASToken_MissingTokenInCredentials(t *testing.T) {
+	f, err := os.CreateTemp("", "azure-creds-*.env")
+	require.NoError(t, err)
+	defer os.Remove(f.Name())
+	_, err = f.WriteString("OTHER_KEY=some_value\n")
+	require.NoError(t, err)
+	f.Close()
+
+	o := &ObjectStore{log: logrus.New()}
+	err = o.initWithSASToken(map[string]string{
+		"storageAccount":                    "myaccount",
+		credentialsFileConfigKey:            f.Name(),
+		storageAccountBlobEndpointConfigKey: "https://myaccount.blob.core.windows.net/",
+	}, "MY_SAS_TOKEN_ENV")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "MY_SAS_TOKEN_ENV")
+}
+
+func TestInitWithSASToken_UseAADConflict(t *testing.T) {
+	o := &ObjectStore{log: logrus.New()}
+	err := o.initWithSASToken(map[string]string{
+		"storageAccount": "myaccount",
+		"useAAD":         "true",
+	}, "MY_SAS_TOKEN_ENV")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mutually exclusive")
+}
+
+func TestInitWithSASToken_MissingEndpoint(t *testing.T) {
+	o := &ObjectStore{log: logrus.New()}
+	err := o.initWithSASToken(map[string]string{
+		"storageAccount": "myaccount",
+	}, "MY_SAS_TOKEN_ENV")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "storageAccountBlobEndpoint is required")
+}
+
+func TestInitWithSASToken_Success(t *testing.T) {
+	f, err := os.CreateTemp("", "azure-creds-*.env")
+	require.NoError(t, err)
+	defer os.Remove(f.Name())
+	_, err = f.WriteString("MY_SAS_TOKEN=sv=2025-05-05&sig=abc123\n")
+	require.NoError(t, err)
+	f.Close()
+
+	o := &ObjectStore{log: logrus.New()}
+	err = o.initWithSASToken(map[string]string{
+		"storageAccount":                    "myaccount",
+		credentialsFileConfigKey:            f.Name(),
+		storageAccountBlobEndpointConfigKey: "https://myaccount.blob.core.windows.net/",
+	}, "MY_SAS_TOKEN")
+	require.NoError(t, err)
+	assert.Equal(t, "sv=2025-05-05&sig=abc123", o.sasToken)
+	assert.Equal(t, "MY_SAS_TOKEN", o.sasTokenEnvVar)
+	assert.NotNil(t, o.containerGetter)
+	assert.NotNil(t, o.blobGetter)
+	assert.Equal(t, defaultBlockSize, o.blockSize)
+}
+
+func TestCreateSignedURL_SASMode(t *testing.T) {
+	tests := []struct {
+		name       string
+		serviceURL string
+		sasToken   string
+		want       string
+	}{
+		{
+			name:       "standard endpoint plain SAS token",
+			serviceURL: "https://myaccount.blob.core.windows.net/",
+			sasToken:   "sv=2025-05-05&sig=abc123",
+			want:       "https://myaccount.blob.core.windows.net/mycontainer/myblob?sv=2025-05-05&sig=abc123",
+		},
+		{
+			name:       "DNS zone endpoint",
+			serviceURL: "https://myaccount.z17.blob.storage.azure.net/",
+			sasToken:   "sv=2025-05-05&sig=abc123",
+			want:       "https://myaccount.z17.blob.storage.azure.net/mycontainer/myblob?sv=2025-05-05&sig=abc123",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			o := &ObjectStore{
+				log:            logrus.New(),
+				sasTokenEnvVar: "TEST_SAS_TOKEN",
+				sasToken:       tc.sasToken,
+				containerGetter: &mockContainerGetterWithURL{
+					serviceURL: tc.serviceURL,
+				},
+				blobGetter: new(mockBlobGetter),
+			}
+
+			url, err := o.CreateSignedURL("mycontainer", "myblob", time.Hour)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, url)
+		})
+	}
+}
+
+type mockContainerGetterWithURL struct {
+	serviceURL string
+}
+
+func (m *mockContainerGetterWithURL) getContainer(_ string) container {
+	return nil
+}
+
+func (m *mockContainerGetterWithURL) URL() string {
+	return m.serviceURL
 }

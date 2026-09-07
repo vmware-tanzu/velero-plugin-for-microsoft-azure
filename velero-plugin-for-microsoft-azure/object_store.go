@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
@@ -45,10 +46,21 @@ const (
 	// ref. https://docs.microsoft.com/en-us/rest/api/storageservices/put-block#uri-parameters
 	maxBlockSize     = 100 * 1024 * 1024
 	defaultBlockSize = 1 * 1024 * 1024
+
+	// storageAccountSASTokenEnvVarConfigKey is the BSL config key whose value is the key name
+	// in the credential file holding a container-scoped SAS token.
+	// SAS tokens are not Azure AD credentials; when set, the standard Azure credential chain
+	// (service principal, workload identity, managed identity, shared key) is bypassed entirely.
+	storageAccountSASTokenEnvVarConfigKey = "storageAccountSASTokenEnvVar"
+
+	// storageAccountBlobEndpointConfigKey is the BSL config key for the blob service endpoint.
+	// Required when using SAS token auth.
+	storageAccountBlobEndpointConfigKey = "storageAccountBlobEndpoint"
 )
 
 type containerGetter interface {
 	getContainer(bucket string) container
+	URL() string
 }
 
 type azureContainerGetter struct {
@@ -61,6 +73,10 @@ func (cg *azureContainerGetter) getContainer(bucket string) container {
 	return &azureContainer{
 		containerClient: containerClient,
 	}
+}
+
+func (cg *azureContainerGetter) URL() string {
+	return cg.serviceClient.URL()
 }
 
 type container interface {
@@ -209,13 +225,60 @@ type ObjectStore struct {
 	blockSize       int
 	// we need to keep the credential here to create the sas url
 	sharedKeyCredential *azblob.SharedKeyCredential
+	// sasTokenEnvVar is the credential key name for SAS token auth; non-empty means SAS mode
+	sasTokenEnvVar string
+	// sasToken is the resolved SAS token value read from the credential file during Init
+	sasToken string
 }
 
 func newObjectStore(logger logrus.FieldLogger) *ObjectStore {
 	return &ObjectStore{log: logger}
 }
 
-// Init sets up the ObjectStore using the shared key or default azure credentials
+// initWithSASToken initialises the ObjectStore using a container-scoped SAS token from the credential file
+func (o *ObjectStore) initWithSASToken(config map[string]string, sasTokenEnvVar string) error {
+	storageAccount := config[azure.BSLConfigStorageAccount]
+	if storageAccount == "" {
+		return errors.New("storageAccount is required in BackupStorageLocation config when using SAS token auth")
+	}
+
+	if config[azure.BSLConfigUseAAD] != "" {
+		return errors.New("useAAD and storageAccountSASTokenEnvVar are mutually exclusive; remove useAAD when using SAS token auth")
+	}
+
+	blobEndpoint := config[storageAccountBlobEndpointConfigKey]
+	if blobEndpoint == "" {
+		return errors.New("storageAccountBlobEndpoint is required in BackupStorageLocation config when using SAS token auth")
+	}
+
+	creds, err := azure.LoadCredentials(config)
+	if err != nil {
+		return errors.Wrap(err, "failed to load credentials file")
+	}
+	sasToken := creds[sasTokenEnvVar]
+	if sasToken == "" {
+		return errors.Errorf("no SAS token with key %s found in credential", sasTokenEnvVar)
+	}
+	sasToken = strings.TrimPrefix(sasToken, "?")
+
+	// ensure the endpoint ends with "/" before appending the SAS token
+	serviceURL := strings.TrimRight(blobEndpoint, "/") + "/?" + sasToken
+
+	client, err := azblob.NewClientWithNoCredential(serviceURL, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to create Azure Blob client with SAS token")
+	}
+
+	o.sasTokenEnvVar = sasTokenEnvVar
+	o.sasToken = sasToken
+	o.containerGetter = &azureContainerGetter{serviceClient: client.ServiceClient()}
+	o.blobGetter = &azureBlobGetter{serviceClient: client.ServiceClient()}
+	o.blockSize = getBlockSize(o.log, config)
+
+	o.log.Infof("ObjectStore initialised with SAS token auth for storage account %q (endpoint: %s)", storageAccount, blobEndpoint)
+	return nil
+}
+
 func (o *ObjectStore) Init(config map[string]string) error {
 	if err := veleroplugin.ValidateObjectStoreConfigKeys(config,
 		azure.BSLConfigResourceGroup,
@@ -227,8 +290,15 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		azure.BSLConfigUseAAD,
 		azure.BSLConfigStorageAccountAccessKeyName,
 		credentialsFileConfigKey,
+		storageAccountSASTokenEnvVarConfigKey,
+		storageAccountBlobEndpointConfigKey,
 	); err != nil {
 		return err
+	}
+
+	// when a SAS token key is configured, skip the standard Azure credential chain
+	if sasTokenEnvVar, ok := config[storageAccountSASTokenEnvVarConfigKey]; ok && sasTokenEnvVar != "" {
+		return o.initWithSASToken(config, sasTokenEnvVar)
 	}
 
 	client, cred, err := azure.NewStorageClient(o.log, config)
@@ -382,6 +452,13 @@ func (o *ObjectStore) DeleteObject(bucket string, key string) error {
 }
 
 func (o *ObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	// in SAS token mode there is no account key or AAD credential to generate a new signed URL,
+	// so reuse the existing container-scoped SAS token which already grants read access;
+	// derive the base URL from the service client so DNS zone endpoints are handled correctly
+	if o.sasTokenEnvVar != "" {
+		base := strings.TrimRight(o.containerGetter.URL(), "/")
+		return fmt.Sprintf("%s/%s/%s?%s", base, bucket, key, o.sasToken), nil
+	}
 	blob := o.blobGetter.getBlob(bucket, key)
 	return blob.GetSASURI(ttl, o.sharedKeyCredential)
 }

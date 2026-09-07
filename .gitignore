@@ -20,3 +20,6 @@ debug
 .idea/
 
 _tiltbuild
+
+# compiled plugin binary
+velero-plugin-for-microsoft-azure/velero-plugin-for-microsoft-azure

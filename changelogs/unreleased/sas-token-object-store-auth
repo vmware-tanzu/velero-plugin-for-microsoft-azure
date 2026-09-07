@@ -1,0 +1,16 @@
+Add SAS token authentication support to the Azure object store plugin.
+
+Two new BSL config keys:
+- storageAccountSASTokenEnvVar: name of the key in the BSL credential file
+  that holds a container-scoped SAS token. When set, all other auth methods
+  (shared key, AAD) are bypassed. A SAS (Shared Access Signature) token is a
+  URI that grants restricted access to Azure Storage resources without
+  exposing the account key.
+- storageAccountBlobEndpoint: explicit blob service endpoint URL. Required for
+  storage accounts using Azure DNS zone endpoints (e.g.
+  https://<account>.z17.blob.storage.azure.net/). Falls back to the standard
+  https://<storageAccount>.blob.core.windows.net/ if omitted.
+
+This enables Velero backup to Azure Blob Storage for storage accounts where
+only a container-scoped SAS token is available — no account key or service
+principal required.
