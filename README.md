@@ -1,5 +1,5 @@
-
 [![Build Status][101]][102]
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fvelero-io%2Fvelero-plugin-for-microsoft-azure.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fvelero-io%2Fvelero-plugin-for-microsoft-azure?ref=badge_shield)
 
 # Velero plugins for Microsoft Azure
 
@@ -680,3 +680,7 @@ We recommend taking incremental snapshots of Azure Disks since they are more cos
 [101]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/workflows/Main%20CI/badge.svg
 [102]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure/actions?query=workflow%3A"Main+CI"
 [103]: https://github.com/vmware-tanzu/velero/issues/new/choose
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fvelero-io%2Fvelero-plugin-for-microsoft-azure.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fvelero-io%2Fvelero-plugin-for-microsoft-azure?ref=badge_large)
